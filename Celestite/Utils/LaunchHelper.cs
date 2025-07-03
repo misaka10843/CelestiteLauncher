@@ -1,8 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Celestite.I18N;
 using Celestite.Network;
@@ -11,11 +7,17 @@ using Celestite.Network.Models;
 using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using FluentAvalonia.UI.Controls;
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using ZeroLog;
 
 namespace Celestite.Utils
 {
     public class LaunchHelper
     {
+        private static readonly Log Logger = LogManager.GetLogger("LaunchHelper");
         public record ProductIdWithType(string ProductId, TApiGameType Type);
         public static bool IsInGuiMode() => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime a && a.MainWindow != null;
         public static async UniTask<ProductIdWithType?> TransformDmmAppIdToProductId(string appId, bool adult, string gameTypeRequired = "PC")
@@ -130,11 +132,10 @@ namespace Celestite.Utils
                     }
                     (launchAfterUpdate, createShortcutAfterUpdate, ContentDialogResult result) = await KashimaDownloadManager.OpenInstallDialog(clInfo);
                     if (result != ContentDialogResult.Primary) return;
-
+                    Logger.Info(clInfo.FileListUrl);
                     if (installCl.Value.HasInstaller)
                     {
                         NotificationHelper.Warn(Localization.DEBUG_InstallerNotImplemented);
-                        return;
                     }
                 }
 

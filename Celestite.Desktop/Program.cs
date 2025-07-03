@@ -1,12 +1,14 @@
-﻿using System;
+﻿using Avalonia;
+using Celestite.Utils;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime;
-using Avalonia;
-using Celestite.Utils;
+using System.Runtime.Versioning;
 using ZeroLog;
 using ZeroLog.Appenders;
 using ZeroLog.Configuration;
 using ZeroLog.Formatting;
+[assembly: RequiresPreviewFeatures]
 
 namespace Celestite.Desktop;
 

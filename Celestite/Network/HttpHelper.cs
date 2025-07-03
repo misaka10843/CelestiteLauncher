@@ -1,4 +1,18 @@
-﻿using System;
+﻿using AngleSharp;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Celestite.I18N;
+using Celestite.Network.Caching;
+using Celestite.Network.CelestiteBypassCore;
+using Celestite.Network.DynamicProxy;
+using Celestite.Utils;
+using Cysharp.Text;
+using Cysharp.Threading.Tasks;
+using Microsoft.Extensions.Http;
+using Polly;
+using Polly.Extensions.Http;
+using Polly.Timeout;
+using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -16,6 +30,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.Versioning;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -25,24 +40,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
-using AngleSharp;
-using Avalonia.Media.Imaging;
-using Avalonia.Platform;
-using Celestite.I18N;
-using Celestite.Network.Caching;
-using Celestite.Network.CelestiteBypassCore;
-using Celestite.Network.DynamicProxy;
-using Celestite.Utils;
-using Cysharp.Text;
-using Cysharp.Threading.Tasks;
-using Microsoft.Extensions.Http;
-using Polly;
-using Polly.Extensions.Http;
-using Polly.Timeout;
 using TurnerSoftware.DinoDNS;
 using TurnerSoftware.DinoDNS.Protocol;
 using TurnerSoftware.DinoDNS.Protocol.ResourceRecords;
 using ZeroLog;
+[assembly: RequiresPreviewFeatures]
 
 namespace Celestite.Network
 {

@@ -1,6 +1,8 @@
-﻿using System.Net;
+﻿using System.Runtime.Versioning;
+using System.Net;
 using System.Net.Quic;
 using System.Net.Security;
+[assembly: RequiresPreviewFeatures]
 
 namespace TurnerSoftware.DinoDNS.Connection.Resolvers
 {
