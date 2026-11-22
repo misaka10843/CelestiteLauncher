@@ -36,7 +36,6 @@ namespace Celestite.ViewModels.DefaultVM
         private readonly Log _logger = LogManager.GetLogger("Login");
 
         private static ContentDialog? _registerFormDialog = null;
-        private static ContentDialog? _defaultLoginFormDialog = null;
 
         public static ContentDialog RegisterFormDialog => LazyInitializer.EnsureInitialized(ref _registerFormDialog,
             () => Dispatcher.UIThread.Invoke(() => new ContentDialog()
@@ -46,113 +45,11 @@ namespace Celestite.ViewModels.DefaultVM
                 Content = new RegisterFormDialog()
             }));
 
-        public static ContentDialog DefaultLoginFormDialog => LazyInitializer.EnsureInitialized(
-            ref _defaultLoginFormDialog, () => Dispatcher.UIThread.Invoke(() => new ContentDialog
-            {
-                Title = Localization.LoginSubtitle,
-                PrimaryButtonText = Localization.DefaultLoginTitle,
-                CloseButtonText = Localization.FormClose,
-                DefaultButton = ContentDialogButton.Primary,
-                Content = new DefaultLoginFormDialog()
-            }));
-
         public LoginPageViewModel()
         {
             if (!Design.IsDesignMode)
                 UniTask.Run(() => ProcessAutoLoginCommand.ExecuteAsync(null));
         }
-
-        private static async UniTask<DmmOpenApiResult> Request(string email, string password, bool saveEmail, bool savePassword, bool autoLogin)
-        {
-            HttpHelper.ClearCookies();
-            var loginResponse = await DmmOpenApiHelper.LegacyLogin(email, password);
-            if (loginResponse.Failed) return loginResponse;
-
-            var session = loginResponse.Value;
-
-            if (!ConfigUtils.TryGetGuidByAccountEmail(email, out var id) || !ConfigUtils.TryGetAccountObjectByGuid(id, out var accountObject))
-                accountObject = new AccountObject();
-
-            accountObject!.SaveEmail = saveEmail;
-            accountObject!.SavePassword = savePassword;
-            if (saveEmail) accountObject!.Email = email;
-            if (savePassword) accountObject!.Password = password;
-            accountObject!.AutoLogin = autoLogin;
-            if (autoLogin)
-            {
-                accountObject.Email = email;
-                accountObject.Password = password;
-            }
-            accountObject.LoginSecureId = session.SecureId;
-            accountObject.LoginSessionId = session.UniqueId;
-            ConfigUtils.PushAccountObject(accountObject);
-            DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId, preserveLoginCookies: true);
-            DmmGamePlayerApiHelper.SetAgeCheckDone();
-            return loginResponse;
-
-            //HttpHelper.ClearCookies();
-            //var loginCodeResponse = await DmmOpenApiHelper.Login(email, password);
-            //if (loginCodeResponse.Failed) return loginCodeResponse;
-
-            //var accessTokenResponse = await DmmGamePlayerApiHelper.IssueAccessToken(loginCodeResponse.Value.Code);
-            //if (accessTokenResponse.Failed) return DmmOpenApiResult.Fail(accessTokenResponse.Error!);
-
-            //string accessToken = accessTokenResponse.Value.AccessToken;
-
-            //if (!ConfigUtils.TryGetGuidByAccountEmail(email, out var id) || !ConfigUtils.TryGetAccountObjectByGuid(id, out var accountObject))
-            //    accountObject = new AccountObject();
-
-            //accountObject!.SaveEmail = saveEmail;
-            //accountObject!.SavePassword = savePassword;
-            //if (saveEmail) accountObject!.Email = email;
-            //if (savePassword) accountObject!.Password = password;
-            //accountObject!.AutoLogin = autoLogin;
-            //if (autoLogin)
-            //{
-            //    accountObject.Email = email;
-            //    accountObject.Password = password;
-            //    accountObject.AccessToken = accessToken;
-            //}
-            //ConfigUtils.PushAccountObject(accountObject);
-            //DmmGamePlayerApiHelper.SetUserHeader(accessToken);
-            //DmmGamePlayerApiHelper.SetAgeCheckDone();
-            //return loginCodeResponse;
-        }
-
-        //private static async UniTask<DmmOpenApiResult> Request(string email, string password, bool saveEmail, bool savePassword, bool autoLogin)
-        //{
-        //    HttpHelper.ClearCookies();
-        //    var login = await DmmOpenApiHelper.Login(email, password);
-        //    if (login.Failed)
-        //        return login;
-        //    var accessToken = await DmmOpenApiHelper.ExchangeAccessToken(login.Value.AccessToken);
-        //    if (accessToken.Failed)
-        //        return accessToken;
-        //    if (!JwtUtils.TryParseIdToken(login.Value.IdToken, out var idToken) || string.IsNullOrEmpty(idToken?.UserId))
-        //        return DmmOpenApiResult.Fail(Localization.InvalidIdTokenError);
-        //    if (!ConfigUtils.TryGetGuidByAccountEmail(email, out var id) ||
-        //        !ConfigUtils.TryGetAccountObjectByGuid(id, out var accountObject) || !ConfigUtils.TryGetAccountObjectByUserId(idToken.UserId!, out accountObject))
-        //        accountObject = new AccountObject();
-        //    accountObject!.SaveEmail = saveEmail;
-        //    accountObject!.SavePassword = savePassword;
-        //    if (saveEmail)
-        //        accountObject!.Email = email;
-        //    if (savePassword)
-        //        accountObject!.Password = password;
-        //    accountObject!.AutoLogin = autoLogin;
-        //    if (autoLogin)
-        //    {
-        //        accountObject.UserId = idToken!.UserId;
-        //        accountObject.RefreshToken = login.Value.RefreshToken;
-        //    }
-        //    var issueSessionId = await DmmOpenApiHelper.IssueSessionId(idToken!.UserId!);
-        //    if (issueSessionId.Failed) return issueSessionId;
-        //    if (!string.IsNullOrEmpty(accountObject.Email) || !string.IsNullOrEmpty(accountObject.UserId))
-        //        ConfigUtils.PushAccountObject(accountObject);
-        //    DmmGamePlayerApiHelper.SetUserCookies(issueSessionId.Value.SecureId, issueSessionId.Value.UniqueId);
-        //    DmmGamePlayerApiHelper.SetAgeCheckDone();
-        //    return issueSessionId;
-        //}
 
         private async UniTask ProcessUser()
         {
@@ -181,102 +78,24 @@ namespace Celestite.ViewModels.DefaultVM
         [RelayCommand]
         private async Task ProcessAutoLogin()
         {
-            if (ConfigUtils.TryGetLastLogin(out var accountObject) && accountObject!.AutoLogin)
+            if (!ConfigUtils.TryGetLastLogin(out var account) || account?.AutoLogin != true)
             {
-                SetLoginStatus();
-                HttpHelper.ClearCookies();
-                SessionIdResponse session;
-                var isValid = await DmmOpenApiHelper.CheckValidity(accountObject.LoginSecureId, accountObject.LoginSessionId);
-                if (isValid)
-                {
-                    session = new SessionIdResponse { SecureId = accountObject.LoginSecureId, UniqueId = accountObject.LoginSessionId };
-                }
-                else
-                {
-                    var loginResponse = await DmmOpenApiHelper.LegacyLogin(accountObject.Email, accountObject.Password);
-                    if (loginResponse.Failed)
-                    {
-                        SetLoginErrorStatus(loginResponse.Error!);
-                        return;
-                    }
-                    session = loginResponse.Value;
-                    accountObject.LoginSecureId = session.SecureId;
-                    accountObject.LoginSessionId = session.UniqueId;
-                    ConfigUtils.PushAccountObject(accountObject);
-                }
-
-                DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId, preserveLoginCookies: !isValid);
-                DmmGamePlayerApiHelper.SetAgeCheckDone();
                 SetDefaultStatus();
-                await ProcessUser();
                 return;
             }
+
+            SetLoginStatus();
+            if (!await DmmOpenApiHelper.CheckValidity(account.LoginSecureId, account.LoginSessionId))
+            {
+                SetLoginErrorStatus(Localization.BrowserLoginSavedSessionExpired);
+                return;
+            }
+
+            DmmGamePlayerApiHelper.SetUserCookies(account.LoginSecureId, account.LoginSessionId);
+            DmmGamePlayerApiHelper.SetAgeCheckDone();
             SetDefaultStatus();
-
-            //if (ConfigUtils.TryGetLastLogin(out var accountObject) && accountObject!.AutoLogin)
-            //{
-            //    SetLoginStatus();
-            //    HttpHelper.ClearCookies();
-            //    string accessToken;
-            //    var checkTokenResponse = await DmmGamePlayerApiHelper.CheckAccessToken(accountObject.AccessToken);
-            //    if (checkTokenResponse.Success && checkTokenResponse.Value.Result)
-            //    {
-            //        accessToken = accountObject.AccessToken;
-            //    }
-            //    else
-            //    {
-            //        var loginCodeResponse = await DmmOpenApiHelper.Login(accountObject.Email, accountObject.Password);
-            //        if (loginCodeResponse.Failed)
-            //        {
-            //            SetLoginErrorStatus(loginCodeResponse.Error!);
-            //            return;
-            //        }
-            //        var accessTokenResponse = await DmmGamePlayerApiHelper.IssueAccessToken(loginCodeResponse.Value.Code);
-            //        if (accessTokenResponse.Failed)
-            //        {
-            //            SetLoginErrorStatus(accessTokenResponse.ErrorMessage!);
-            //            return;
-            //        }
-            //        accessToken = accessTokenResponse.Value.AccessToken;
-            //        accountObject.AccessToken = accessToken;
-            //        ConfigUtils.PushAccountObject(accountObject);
-            //    }
-
-            //    DmmGamePlayerApiHelper.SetUserHeader(accessToken);
-            //    DmmGamePlayerApiHelper.SetAgeCheckDone();
-            //    await ProcessUser();
-            //}
-            //SetDefaultStatus();
+            await ProcessUser();
         }
-
-        //[RelayCommand]
-        //private async Task ProcessAutoLogin()
-        //{
-        //    if (ConfigUtils.TryGetLastLogin(out var accountObject) && accountObject!.AutoLogin)
-        //    {
-        //        SetLoginStatus();
-        //        HttpHelper.ClearCookies();
-        //        DmmOpenApiHelper.UpdateRefreshToken(accountObject!.RefreshToken);
-        //        var login = await DmmOpenApiHelper.RefreshToken();
-        //        if (login.Failed)
-        //        {
-        //            SetLoginErrorStatus(login.Error!);
-        //            return;
-        //        }
-        //        accountObject.RefreshToken = login.Value.RefreshToken;
-        //        ConfigUtils.PushAccountObject(accountObject);
-        //        var issueSessionId = await DmmOpenApiHelper.IssueSessionId(accountObject.UserId!);
-        //        if (issueSessionId.Failed)
-        //        {
-        //            SetLoginErrorStatus(issueSessionId.Error!);
-        //            return;
-        //        }
-        //        DmmGamePlayerApiHelper.SetUserCookies(issueSessionId.Value.SecureId, issueSessionId.Value.UniqueId);
-        //        DmmGamePlayerApiHelper.SetAgeCheckDone();
-        //        await ProcessUser();
-        //    }
-        //    SetDefaultStatus();
-        //}
 
         [RelayCommand]
         private async Task ShowRegisterButton()
@@ -388,29 +207,6 @@ namespace Celestite.ViewModels.DefaultVM
             return code is [var value] && !string.IsNullOrWhiteSpace(value) && value.Length <= 512 && !value.Contains(',')
                 ? value
                 : null;
-        }
-
-        [RelayCommand]
-        private async Task ShowDefaultLoginButton()
-        {
-            var viewModel = Dispatcher.UIThread.Invoke(() => ((UserControl)DefaultLoginFormDialog.Content!).DataContext as DefaultLoginFormDialogViewModel)!;
-            viewModel.Reset(lockSave: false);
-            var result = await DefaultLoginFormDialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-                SetLoginStatus();
-
-                var requestOp = await Request(viewModel.Email, viewModel.Password, viewModel.SaveEmail, viewModel.SavePassword, viewModel.AutoLogin);
-                if (requestOp.Failed)
-                {
-                    SetLoginErrorStatus(requestOp.Error!);
-                }
-                else
-                {
-                    SetDefaultStatus();
-                    await ProcessUser();
-                }
-            }
         }
 
         [RelayCommand]

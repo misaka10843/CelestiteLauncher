@@ -21,15 +21,13 @@ namespace Celestite.Network
         private const string ArtemisAdult = "https://artemis.games.dmm.co.jp";
 
         private const string ActivateDmmAddress = "activate.games.dmm.com/browser-game/install";
-        private const string HimariProxyActivateAddress =
-            "celestite-himari-proxy.kengxxiao.com/3292efe9917f4eafc58f271cfb5b14fe71e53f3d";
 
         public record BrowserGameLaunchContext(IEnumerable<string> Scripts, string Schema);
 
         public static async UniTask<bool> TryAddBrowserGame(string productId, bool isNotificationAllowed, bool isDisplayAllowed, bool isSpGame = false)
         {
             using var activateRequest = await HttpHelper.GetAsync(
-                $"https://{(ConfigUtils.GetHimariProxyStatus() ? HimariProxyActivateAddress : ActivateDmmAddress)}/{productId}?isNotificationAllowed={isNotificationAllowed.ToString().ToLower()}&isDisplayAllowed={isDisplayAllowed.ToString().ToLower()}", forceMobileUserAgent: isSpGame, addSessionId: ConfigUtils.GetHimariProxyStatus());
+                $"https://{ActivateDmmAddress}/{productId}?isNotificationAllowed={isNotificationAllowed.ToString().ToLower()}&isDisplayAllowed={isDisplayAllowed.ToString().ToLower()}", forceMobileUserAgent: isSpGame);
             if (activateRequest.Failed) return false;
             if (activateRequest.Value.StatusCode == HttpStatusCode.SeeOther) return true;
             NotificationHelper.Warn(Localization.AddBrowserGameFailed);
@@ -42,14 +40,6 @@ namespace Celestite.Network
             var request = await HttpHelper.GetJsonAsync(advancedType.IsAdult ? ArtemisAdult : ArtemisGeneral, getUrl, DmmGamePlayerApiResponseBaseContext.Default.ArtemisInitGameFrameResponse, advancedType.IsAdult ? ArtemisAdult : ArtemisGeneral, "play");
             if (request.Failed) return null;
             return request.Value;
-        }
-
-        public static async UniTask<bool> ArtemisStartGamePlaying(string titleId, DmmTypeApiGame advancedType, string browserEnv = "PC")
-        {
-            var url = ZString.Format("{0}/member/{1}/mission/start-game-playing", advancedType.IsAdult ? ArtemisAdult : ArtemisGeneral, browserEnv.ToLower());
-            var isMobile = browserEnv == "SP";
-            var request = await HttpHelper.PostJsonAsync(url, new ArtemisStartPlayingRequest { TitleId = titleId }, DmmGamePlayerApiRequestBaseContext.Default.ArtemisStartPlayingRequest, useMobileUa: isMobile, referer: advancedType.IsAdult ? "https://play.games.dmm.co.jp" : "https://play.games.dmm.com");
-            return request.Success;
         }
 
         public static string GetBrowserGameUrl(string productId, DmmTypeApiGame advancedType, string browserEnv = "PC")
@@ -66,21 +56,6 @@ namespace Celestite.Network
             using var page = await HttpHelper.HtmlParserContext.OpenAsync(x => x.Content(request.Value.Item1));
             var scripts = page.QuerySelectorAll("script[type='text/javascript']").Where(x => x is IHtmlScriptElement script && !string.IsNullOrEmpty(script.InnerHtml)).Cast<IHtmlScriptElement>().Select(x => x.InnerHtml);
             return new BrowserGameLaunchContext(scripts.ToList(), request.Value.Item2);
-        }
-
-        public static bool FindAndInvokeMissionCall(IEnumerable<string> scripts)
-        {
-            var missionCall = scripts.FirstOrDefault(x => x.Contains("api-mission.games.dmm.com"));
-            if (missionCall == null) return false;
-            var apiUrl = ExtractStringVariableValue(missionCall, "apiUrl");
-            var data = ExtractStringVariableValue(missionCall, "data");
-            if (!string.IsNullOrEmpty(apiUrl) && !string.IsNullOrEmpty(data))
-            {
-                UniTask.Run(async () => await HttpHelper.PostRawStringAsJsonAsync(apiUrl, data));
-                return true;
-            }
-
-            return false;
         }
 
         public static string FindAndInvokeLaunchGame(BrowserGameLaunchContext context)

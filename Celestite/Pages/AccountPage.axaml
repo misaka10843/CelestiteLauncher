@@ -14,16 +14,7 @@
 		<vm:AccountPageViewModel></vm:AccountPageViewModel>
 	</UserControl.DataContext>
 	<StackPanel Spacing="8">
-		<DockPanel LastChildFill="False">
-			<TextBlock DockPanel.Dock="Left" Margin="0, 8" Text="{x:Static loc:Localization.HeaderAccount}" Theme="{StaticResource SubtitleTextBlockStyle}" ></TextBlock>
-			<fluent:CommandBar DockPanel.Dock="Right" DefaultLabelPosition="Right">
-				<fluent:CommandBar.PrimaryCommands>
-					<fluent:CommandBarButton Command="{Binding AddAccountCommand}"
-                        IconSource="PersonAdd" Label="{x:Static loc:Localization.AccountAdd}"
-                    ></fluent:CommandBarButton>
-				</fluent:CommandBar.PrimaryCommands>
-			</fluent:CommandBar>
-		</DockPanel>
+		<TextBlock Margin="0, 8" Text="{x:Static loc:Localization.HeaderAccount}" Theme="{StaticResource SubtitleTextBlockStyle}"/>
 		<ItemsRepeater IsEnabled="True" ItemsSource="{Binding AccountObjects}" x:Name="Repeater">
 			<ItemsRepeater.Layout>
 				<StackLayout Spacing="8"></StackLayout>

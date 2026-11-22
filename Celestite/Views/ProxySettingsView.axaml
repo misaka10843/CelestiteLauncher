@@ -1,0 +1,14 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:Celestite.I18N"
+             x:Class="Celestite.Views.ProxySettingsView">
+    <Expander Header="{x:Static loc:Localization.CustomProxyTitle}" HorizontalAlignment="Stretch">
+        <StackPanel Spacing="8">
+            <TextBlock Text="{x:Static loc:Localization.CustomProxyDescription}" TextWrapping="Wrap"/>
+            <TextBox x:Name="ProxyAddress" Watermark="http://127.0.0.1:7890"/>
+            <CheckBox x:Name="PassToGames" Content="{x:Static loc:Localization.CustomProxyGames}"/>
+            <Button Content="{x:Static loc:Localization.CustomProxySave}" Click="SaveProxy"/>
+            <TextBlock x:Name="Status" TextWrapping="Wrap"/>
+        </StackPanel>
+    </Expander>
+</UserControl>

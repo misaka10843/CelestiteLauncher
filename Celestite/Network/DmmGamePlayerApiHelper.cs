@@ -179,12 +179,11 @@ namespace Celestite.Network
             LoginSessionChangedEvent?.Invoke(null, EventArgs.Empty);
         }
 
-        public static void SetUserCookies(string secureId, string sessionId, bool preserveLoginCookies = false)
+        public static void SetUserCookies(string secureId, string sessionId)
         {
             HttpHelper.ActAuth = string.Empty;
             foreach (Cookie c in HttpHelper.GlobalCookieContainer.GetAllCookies())
-                if (!preserveLoginCookies || c.Name is "login_secure_id" or "login_session_id")
-                    c.Expired = true;
+                c.Expired = true;
             HttpHelper.GlobalCookieContainer.Add([
                 new Cookie("login_secure_id", secureId, "/", ".dmm.com"),
                 new Cookie("login_secure_id", secureId, "/", ".dmm.co.jp"),

@@ -225,134 +225,25 @@ namespace Celestite.Utils
             }
         }
 
-        private static async Task<bool> NoGuiLogin(LaunchCommandLine launchCommandLine)
+        private static async Task<bool> NoGuiLogin(LaunchCommandLine command)
         {
-            HttpHelper.ClearCookies();
-            SessionIdResponse session;
-            if (!string.IsNullOrEmpty(launchCommandLine.Username) && !string.IsNullOrEmpty(launchCommandLine.Password))
+            if (!string.IsNullOrEmpty(command.Username) || !string.IsNullOrEmpty(command.Password))
             {
-                var loginResponse = await DmmOpenApiHelper.LegacyLogin(launchCommandLine.Username, launchCommandLine.Password);
-                if (loginResponse.Failed) return false;
-                session = loginResponse.Value;
-            }
-            else
-            {
-                if (ConfigUtils.TryGetLastLogin(out var accountObject) && accountObject!.AutoLogin)
-                {
-                    bool isValid = await DmmOpenApiHelper.CheckValidity(accountObject.LoginSecureId, accountObject.LoginSessionId);
-                    if (isValid)
-                    {
-                        session = new SessionIdResponse { SecureId = accountObject.LoginSecureId, UniqueId = accountObject.LoginSessionId };
-                    }
-                    else
-                    {
-                        var loginResponse = await DmmOpenApiHelper.LegacyLogin(launchCommandLine.Username, launchCommandLine.Password);
-                        if (loginResponse.Failed) return false;
-                        session = loginResponse.Value;
-                        accountObject.LoginSecureId = session.SecureId;
-                        accountObject.LoginSessionId = session.UniqueId;
-                        ConfigUtils.PushAccountObject(accountObject);
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("Cannot find valid login session on Celestite save state, use --username and --password to login or do that in GUI mode.");
-                    return false;
-                }
+                Console.WriteLine("Password sign-in has been disabled. Sign in from the Celestite window.");
+                return false;
             }
 
-            DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId);
+            if (!ConfigUtils.TryGetLastLogin(out var account) || account?.AutoLogin != true ||
+                !await DmmOpenApiHelper.CheckValidity(account.LoginSecureId, account.LoginSessionId))
+            {
+                Console.WriteLine("No valid saved session. Sign in from the Celestite window.");
+                return false;
+            }
+
+            DmmGamePlayerApiHelper.SetUserCookies(account.LoginSecureId, account.LoginSessionId);
             DmmGamePlayerApiHelper.SetAgeCheckDone();
             return true;
-
-            //HttpHelper.ClearCookies();
-            //string accessToken;
-            //if (!string.IsNullOrEmpty(launchCommandLine.Username) && !string.IsNullOrEmpty(launchCommandLine.Password))
-            //{
-            //    var loginCodeResponse = await DmmOpenApiHelper.Login(launchCommandLine.Username, launchCommandLine.Password);
-            //    if (loginCodeResponse.Failed) return false;
-            //    var accessTokenResponse = await DmmGamePlayerApiHelper.IssueAccessToken(loginCodeResponse.Value.Code);
-            //    if (accessTokenResponse.Failed) return false;
-            //    accessToken = accessTokenResponse.Value.AccessToken;
-            //}
-            //else
-            //{
-            //    if (ConfigUtils.TryGetLastLogin(out var accountObject) && accountObject!.AutoLogin)
-            //    {
-            //        var checkTokenResponse = await DmmGamePlayerApiHelper.CheckAccessToken(accountObject.AccessToken);
-            //        if (checkTokenResponse.Success && checkTokenResponse.Value.Result)
-            //        {
-            //            accessToken = accountObject.AccessToken;
-            //        }
-            //        else
-            //        {
-            //            var loginCodeResponse = await DmmOpenApiHelper.Login(launchCommandLine.Username, launchCommandLine.Password);
-            //            if (loginCodeResponse.Failed) return false;
-            //            var accessTokenResponse = await DmmGamePlayerApiHelper.IssueAccessToken(loginCodeResponse.Value.Code);
-            //            if (accessTokenResponse.Failed) return false;
-            //            accessToken = accessTokenResponse.Value.AccessToken;
-            //            accountObject.AccessToken = accessToken;
-            //            ConfigUtils.PushAccountObject(accountObject);
-            //        }
-            //    }
-            //    else
-            //    {
-            //        Console.WriteLine("Cannot find valid login session on Celestite save state, use --username and --password to login or do that in GUI mode.");
-            //        return false;
-            //    }
-            //}
-
-            //DmmGamePlayerApiHelper.SetUserHeader(accessToken);
-            //DmmGamePlayerApiHelper.SetAgeCheckDone();
-            //return true;
         }
-
-        //private static async Task<bool> NoGuiLogin(LaunchCommandLine launchCommandLine)
-        //{
-        //    string? userId;
-        //    if (!string.IsNullOrEmpty(launchCommandLine.Username) && !string.IsNullOrEmpty(launchCommandLine.Password))
-        //    {
-        //        var login = await DmmOpenApiHelper.Login(launchCommandLine.Username, launchCommandLine.Password);
-        //        if (login.Failed)
-        //            return false;
-        //        var accessToken = await DmmOpenApiHelper.ExchangeAccessToken(login.Value.AccessToken);
-        //        if (accessToken.Failed)
-        //            return false;
-        //        if (!JwtUtils.TryParseIdToken(login.Value.IdToken, out var idToken) || string.IsNullOrEmpty(idToken?.UserId))
-        //            return false;
-        //        userId = idToken.UserId;
-        //    }
-        //    else
-        //    {
-        //        if (ConfigUtils.TryGetLastLogin(out var accountObject) && accountObject!.AutoLogin)
-        //        {
-        //            DmmOpenApiHelper.UpdateRefreshToken(accountObject!.RefreshToken);
-        //            var login = await DmmOpenApiHelper.RefreshToken();
-        //            if (login.Failed)
-        //                return false;
-        //            accountObject.RefreshToken = login.Value.RefreshToken;
-        //            ConfigUtils.PushAccountObject(accountObject);
-        //        }
-        //        else
-        //        {
-        //            Console.WriteLine("Cannot find valid login session on Celestite save state, use --username and --password to login or do that in GUI mode.");
-        //            return false;
-        //        }
-        //        userId = accountObject.UserId;
-        //    }
-
-        //    if (string.IsNullOrEmpty(userId))
-        //    {
-        //        Console.WriteLine("Invalid userId.");
-        //        return false;
-        //    }
-        //    var loginSession = await DmmOpenApiHelper.IssueSessionId(userId);
-        //    if (loginSession.Failed)
-        //        return false;
-        //    DmmGamePlayerApiHelper.SetUserCookies(loginSession.Value.SecureId, loginSession.Value.UniqueId);
-        //    DmmGamePlayerApiHelper.SetAgeCheckDone();
-        //    return true;
-        //}
 
         [LibraryImport("kernel32")]
         [return: MarshalAs(UnmanagedType.Bool)]

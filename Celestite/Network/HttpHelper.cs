@@ -104,16 +104,6 @@ namespace Celestite.Network
             return GlobalCookieContainer.GetAllCookies();
         }
 
-        public static string EncryptHimariProxyHeader(string data)
-        {
-            using var hmrCertStream = AssetLoader.Open(new Uri("avares://Celestite/Assets/Cert/himari_proxy.pem"));
-            using var sr = new StreamReader(hmrCertStream);
-            using var rsa = RSA.Create();
-            rsa.ImportFromPem(sr.ReadToEnd());
-
-            return CyBase64.EncodeToBase64UrlString(rsa.Encrypt(Encoding.UTF8.GetBytes(data), RSAEncryptionPadding.Pkcs1));
-        }
-
 
         private static X509Certificate2[] GenerateCertificates()
         {
@@ -369,23 +359,6 @@ namespace Celestite.Network
             }
         }
 
-        public static async UniTask<NetworkOperationResult> PostRawStringAsJsonAsync(string url, string jsonData,
-            CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                using var content = new StringContent(jsonData, new MediaTypeHeaderValue("application/json"));
-                using var request = new HttpRequestMessage(HttpMethod.Post, url);
-                request.Content = content;
-                await MainHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                return NetworkOperationResult.Ok();
-            }
-            catch (Exception ex)
-            {
-                return NetworkOperationResult.Fail(ex);
-            }
-        }
-
         public static async UniTask<NetworkOperationResult<Tuple<string, string>>> AdvancedGetStringAsync(string baseUrl, string path,
             CancellationToken cancellationToken = default)
         {
@@ -431,9 +404,9 @@ namespace Celestite.Network
 
         private const string MobileUa =
             "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1 Edg/120.0.0.0";
-        public static async UniTask<NetworkOperationResult<HttpResponseMessage>> GetAsync(string url, bool forceMobileUserAgent = false, bool addSessionId = false, CancellationToken cancellationToken = default)
-            => await GetAsync(new Uri(url), forceMobileUserAgent, addSessionId, cancellationToken);
-        public static async UniTask<NetworkOperationResult<HttpResponseMessage>> GetAsync(Uri url, bool forceMobileUserAgent = false, bool addSessionId = false, CancellationToken cancellationToken = default)
+        public static async UniTask<NetworkOperationResult<HttpResponseMessage>> GetAsync(string url, bool forceMobileUserAgent = false, CancellationToken cancellationToken = default)
+            => await GetAsync(new Uri(url), forceMobileUserAgent, cancellationToken);
+        public static async UniTask<NetworkOperationResult<HttpResponseMessage>> GetAsync(Uri url, bool forceMobileUserAgent = false, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -442,12 +415,6 @@ namespace Celestite.Network
                 request.RequestUri = url;
                 request.Headers.TryAddWithoutValidation("User-Agent",
                     forceMobileUserAgent ? MobileUa : SystemInfoUtils.RequestHeaderUserAgentName);
-
-                if (addSessionId && !string.IsNullOrEmpty(LoginSecureId) && !string.IsNullOrEmpty(LoginSessionId))
-                {
-                    request.Headers.TryAddWithoutValidation("X-Dmm-Secure-Id", EncryptHimariProxyHeader(LoginSecureId));
-                    request.Headers.TryAddWithoutValidation("X-Dmm-Session-Id", EncryptHimariProxyHeader(LoginSessionId));
-                }
 
                 using var httpResponse = await MainHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 return NetworkOperationResult.Ok(httpResponse);
@@ -629,11 +596,9 @@ namespace Celestite.Network
         }
 
 
-        public static async UniTask<NetworkOperationResult<TResp>> DgpPostJson2Async<TReq, TResp>(string path, TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, JsonTypeInfo<TResp> responseJsonTypeInfo, bool forceMobileUserAgent = false, bool addSessionId = false, CancellationToken cancellationToken = default) where TResp : class
-            => await PostJsonAsync(ApiBase, path, request, requestJsonTypeInfo, responseJsonTypeInfo, forceMobileUserAgent, addSessionId, cancellationToken);
         public static async UniTask<NetworkOperationResult<TResp>> DgpPostJsonAsync<TReq, TResp>(string path, TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, JsonTypeInfo<TResp> responseJsonTypeInfo, CancellationToken cancellationToken = default,
             [System.Runtime.CompilerServices.CallerMemberName] string operation = "") where TResp : class
-            => TraceDgpLoginRequired(await PostJsonAsync(ApiBase, path, request, requestJsonTypeInfo, responseJsonTypeInfo, false, false, cancellationToken), operation);
+            => TraceDgpLoginRequired(await PostJsonAsync(ApiBase, path, request, requestJsonTypeInfo, responseJsonTypeInfo, false, cancellationToken), operation);
 
         public static async UniTask<NetworkOperationResult> PostJsonAsync<TReq>(string url,
             TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, bool useMobileUa = false, string referer = "", CancellationToken cancellationToken = default)
@@ -658,7 +623,7 @@ namespace Celestite.Network
             }
         }
 
-        public static async UniTask<NetworkOperationResult<TResp>> PostJsonAsync<TReq, TResp>(string baseUrl, string path, TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, JsonTypeInfo<TResp> responseJsonTypeInfo, bool forceMobileUserAgent = false, bool addSessionId = false, CancellationToken cancellationToken = default) where TResp : class
+        public static async UniTask<NetworkOperationResult<TResp>> PostJsonAsync<TReq, TResp>(string baseUrl, string path, TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, JsonTypeInfo<TResp> responseJsonTypeInfo, bool forceMobileUserAgent = false, CancellationToken cancellationToken = default) where TResp : class
         {
             try
             {
@@ -670,12 +635,6 @@ namespace Celestite.Network
                     forceMobileUserAgent ? MobileUa : SystemInfoUtils.RequestHeaderUserAgentName);
                 AddGamePlayerAuthorization(requestMessage);
                 requestMessage.Content = content;
-
-                if (addSessionId && !string.IsNullOrEmpty(LoginSecureId) && !string.IsNullOrEmpty(LoginSessionId))
-                {
-                    requestMessage.Headers.TryAddWithoutValidation("X-Dmm-Secure-Id", EncryptHimariProxyHeader(LoginSecureId));
-                    requestMessage.Headers.TryAddWithoutValidation("X-Dmm-Session-Id", EncryptHimariProxyHeader(LoginSessionId));
-                }
 
                 using var httpResponse = await MainHttpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 httpResponse.EnsureSuccessStatusCode();

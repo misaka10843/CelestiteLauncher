@@ -15,8 +15,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TurnerSoftware.DinoDNS", "3
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WanaKanaShaapu", "3rdParty\WanaKanaShaapu\WanaKanaShaapu\WanaKanaShaapu.csproj", "{7128C04D-85CB-494C-8CF9-30A9B90F80ED}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Celestite.HimariProxy", "Celestite.HimariProxy\Celestite.HimariProxy.csproj", "{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Carleen", "..\Celestite.WebView\Celestite.WebView\Celestite.WebView.vcxproj", "{23255A5E-9A68-43B5-958E-CA781F87D035}"
 EndProject
 Global
@@ -101,18 +99,6 @@ Global
 		{7128C04D-85CB-494C-8CF9-30A9B90F80ED}.Release|x64.Build.0 = Release|Any CPU
 		{7128C04D-85CB-494C-8CF9-30A9B90F80ED}.Release|x86.ActiveCfg = Release|Any CPU
 		{7128C04D-85CB-494C-8CF9-30A9B90F80ED}.Release|x86.Build.0 = Release|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Debug|x64.Build.0 = Debug|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Debug|x86.Build.0 = Debug|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Release|x64.ActiveCfg = Release|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Release|x64.Build.0 = Release|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Release|x86.ActiveCfg = Release|Any CPU
-		{6C8C0FBE-B230-4CD1-84A9-518A59BD5D26}.Release|x86.Build.0 = Release|Any CPU
 		{23255A5E-9A68-43B5-958E-CA781F87D035}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{23255A5E-9A68-43B5-958E-CA781F87D035}.Debug|Any CPU.Build.0 = Debug|x64
 		{23255A5E-9A68-43B5-958E-CA781F87D035}.Debug|x64.ActiveCfg = Debug|x64

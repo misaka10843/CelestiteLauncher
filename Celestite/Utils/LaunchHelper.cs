@@ -18,49 +18,14 @@ namespace Celestite.Utils
     public class LaunchHelper
     {
         private static readonly Log Logger = LogManager.GetLogger("LaunchHelper");
-        public record ProductIdWithType(string ProductId, TApiGameType Type);
         public static bool IsInGuiMode() => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime a && a.MainWindow != null;
-        public static async UniTask<ProductIdWithType?> TransformDmmAppIdToProductId(string appId, bool adult, string gameTypeRequired = "PC")
-        {
-            var hermesData = await DmmHermesHelper.GetGameList(adult, gameTypeRequired);
-            if (hermesData.Count == 0) return null;
 
-            var targetGame = hermesData.FirstOrDefault(x => x.Id.StartsWith(appId) && x.Id.EndsWith(gameTypeRequired, StringComparison.OrdinalIgnoreCase));
-            if (targetGame == null || !targetGame.Id.Contains("social")) return null;
-
-            var uri = new Uri(targetGame.Link);
-            if (uri.Segments.Length != 3 || !uri.Host.StartsWith("games.dmm")) return null;
-            var gameId = uri.Segments[^1].Trim('/');
-            return new ProductIdWithType(gameId, uri.Host.EndsWith("co.jp") ? TApiGameType.ASBROWSER : TApiGameType.GSBROWSER);
-        }
-
-        public static UniTask EmulateLaunch(string productId, TApiGameType gameType, string env = "PC") => EmulateLaunch(productId,
-            DmmTypeApiGameHelper.GetGameTypeDataFromApiGameType(gameType), env);
-
-        public static async UniTask EmulateLaunch(string productId, DmmTypeApiGame gameType, string browserEnv = "PC")
+        public static async UniTask EmulateLaunch(string productId, DmmTypeApiGame gameType)
         {
             if (gameType.IsCl)
             {
                 var clInfo = await DmmGamePlayerApiHelper.LaunchClGame(productId, gameType.GameType, default);
                 if (clInfo.Failed) return;
-                NotificationHelper.Success(Localization.EmuLaunchSuccess);
-                return;
-            }
-
-            if (gameType.IsSocialBrowser)
-            {
-                var context = await DmmBrowserGameLaunchHelper.GetBrowserPageContext(productId, gameType, browserEnv);
-                if (context == null) return;
-                if (!DmmBrowserGameLaunchHelper.FindAndInvokeMissionCall(context.Scripts))
-                {
-                    // 一些游戏使用 Artemis API 获取启动参数和完成任务
-                    var startPlayingSuccess = await DmmBrowserGameLaunchHelper.ArtemisStartGamePlaying(productId, gameType, browserEnv);
-                    if (!startPlayingSuccess)
-                    {
-                        NotificationHelper.Warn(Localization.EmuLaunchFailed);
-                        return;
-                    }
-                }
                 NotificationHelper.Success(Localization.EmuLaunchSuccess);
                 return;
             }
@@ -172,9 +137,6 @@ namespace Celestite.Utils
                 }
                 var context = await DmmBrowserGameLaunchHelper.GetBrowserPageContext(productId, apiType);
                 if (context == null) return;
-                var missionFindSuccess = DmmBrowserGameLaunchHelper.FindAndInvokeMissionCall(context.Scripts);
-                if (!missionFindSuccess)
-                    await DmmBrowserGameLaunchHelper.ArtemisStartGamePlaying(productId, apiType); // 尝试使用 Artemis API
                 var launchUrl = DmmBrowserGameLaunchHelper.FindAndInvokeLaunchGame(context);
                 if (string.IsNullOrEmpty(launchUrl))
                 {

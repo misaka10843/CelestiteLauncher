@@ -15,7 +15,6 @@
 
 	<ItemGroup>
 		<AvaloniaResource Include="Assets\celestite-icon.png" />
-		<AvaloniaResource Include="Assets\Cert\himari_proxy.pem" />
 		<AvaloniaResource Include="Assets\I18N\en-US.json" />
 		<AvaloniaResource Include="Assets\I18N\zh-CN.json" />
 	</ItemGroup>

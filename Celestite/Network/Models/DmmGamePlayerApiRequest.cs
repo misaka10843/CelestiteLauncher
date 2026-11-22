@@ -192,13 +192,6 @@ public class WsTokenRequest
     public string Token { get; set; } = string.Empty;
 }
 
-// artemis
-public class ArtemisStartPlayingRequest
-{
-    [JsonPropertyName("titleId")]
-    public string TitleId { get; set; } = string.Empty;
-}
-
 [JsonSerializable(typeof(AuthLoginUrlRequest))]
 [JsonSerializable(typeof(IssueAccessTokenRequest))]
 [JsonSerializable(typeof(CheckAccessTokenRequest))]
@@ -224,7 +217,6 @@ public class ArtemisStartPlayingRequest
 [JsonSerializable(typeof(DocumentAgreementAgreeRequest))]
 [JsonSerializable(typeof(ShortcutRequest))]
 [JsonSerializable(typeof(RejectCertifiedDeviceRequest))]
-[JsonSerializable(typeof(ArtemisStartPlayingRequest))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 public partial class DmmGamePlayerApiRequestBaseContext : JsonSerializerContext
 {

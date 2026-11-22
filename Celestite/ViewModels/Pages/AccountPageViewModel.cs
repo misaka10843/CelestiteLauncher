@@ -55,139 +55,6 @@ namespace Celestite.ViewModels.Pages
         }
 
         [RelayCommand]
-        private async Task AddAccount()
-        {
-            var viewModel = Dispatcher.UIThread.Invoke(() => ((UserControl)LoginPageViewModel.DefaultLoginFormDialog.Content!).DataContext as DefaultLoginFormDialogViewModel)!;
-            viewModel.Reset(lockSave: true);
-
-            var result = await LoginPageViewModel.DefaultLoginFormDialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-                if (AccountObjects.Any(x => x.Email == viewModel.Email))
-                {
-                    NotificationHelper.Warn(Localization.AccountIsExistsError);
-                    return;
-                }
-
-                if (string.IsNullOrEmpty(viewModel.Email))
-                {
-                    NotificationHelper.Warn(Localization.EmailRequiredErrorMessage);
-                    return;
-                }
-                if (string.IsNullOrEmpty(viewModel.Password))
-                {
-                    NotificationHelper.Warn(Localization.PasswordRequiredErrorMessage);
-                    return;
-                }
-
-                IsAccountBusy = true;
-
-                try
-                {
-                    HttpHelper.ClearCookies();
-                    var loginResponse = await DmmOpenApiHelper.LegacyLogin(viewModel.Email, viewModel.Password);
-                    if (loginResponse.Failed)
-                    {
-                        NotificationHelper.Warn($"Login failed, {loginResponse.Error!.Reason}");
-                        return;
-                    }
-
-                    var acc = new AccountObject
-                    {
-                        AutoLogin = viewModel.AutoLogin,
-                        Email = viewModel.Email,
-                        Password = viewModel.Password,
-                        LoginSecureId = loginResponse.Value.SecureId,
-                        LoginSessionId = loginResponse.Value.UniqueId,
-                        SaveEmail = true,
-                        SavePassword = true
-                    };
-                    ConfigUtils.PushAccountObject(acc, notPushLastLogin: true);
-                    AccountObjects.Add(new AccountObjectForRenderer(acc.Email, string.Empty, acc.Id, viewModel.AutoLogin, false));
-                    DmmGamePlayerApiHelper.SetUserCookies(HttpHelper.LoginSecureId, HttpHelper.LoginSessionId);
-                    NotificationHelper.Success(Localization.AddAccountSuccess);
-
-                    //HttpHelper.ClearCookies();
-                    //var loginCodeResponse = await DmmOpenApiHelper.Login(viewModel.Email, viewModel.Password);
-                    //if (loginCodeResponse.Failed) return;
-
-                    //var accessTokenResponse = await DmmGamePlayerApiHelper.IssueAccessToken(loginCodeResponse.Value.Code);
-                    //if (accessTokenResponse.Failed) return;
-
-                    //var acc = new AccountObject
-                    //{
-                    //    AutoLogin = viewModel.AutoLogin,
-                    //    Email = viewModel.Email,
-                    //    Password = viewModel.Password,
-                    //    AccessToken = accessTokenResponse.Value.AccessToken,
-                    //    SaveEmail = true,
-                    //    SavePassword = true
-                    //};
-                    //ConfigUtils.PushAccountObject(acc, notPushLastLogin: true);
-                    //AccountObjects.Add(new AccountObjectForRenderer(acc.Email, string.Empty, acc.Id, viewModel.AutoLogin, false));
-                    //NotificationHelper.Success(Localization.AddAccountSuccess);
-                }
-                finally
-                {
-                    IsAccountBusy = false;
-                }
-            }
-        }
-
-        //[RelayCommand]
-        //private async Task AddAccount()
-        //{
-        //    var viewModel = Dispatcher.UIThread.Invoke(() => ((UserControl)LoginPageViewModel.DefaultLoginFormDialog.Content!).DataContext as DefaultLoginFormDialogViewModel)!;
-        //    viewModel.Reset(lockSave: true);
-
-        //    var result = await LoginPageViewModel.DefaultLoginFormDialog.ShowAsync();
-        //    if (result == ContentDialogResult.Primary)
-        //    {
-        //        if (AccountObjects.Any(x => x.Email == viewModel.Email))
-        //        {
-        //            NotificationHelper.Warn(Localization.AccountIsExistsError);
-        //            return;
-        //        }
-
-        //        if (string.IsNullOrEmpty(viewModel.Email))
-        //        {
-        //            NotificationHelper.Warn(Localization.EmailRequiredErrorMessage);
-        //            return;
-        //        }
-        //        if (string.IsNullOrEmpty(viewModel.Password))
-        //        {
-        //            NotificationHelper.Warn(Localization.PasswordRequiredErrorMessage);
-        //            return;
-        //        }
-
-        //        IsAccountBusy = true;
-
-        //        try
-        //        {
-        //            var login = await DmmOpenApiHelper.Login(viewModel.Email, viewModel.Password);
-        //            if (login.Failed) return;
-        //            var acc = new AccountObject
-        //            {
-        //                AutoLogin = viewModel.AutoLogin,
-        //                Email = viewModel.Email,
-        //                Password = viewModel.Password,
-        //                RefreshToken = login.Value.RefreshToken,
-        //                SaveEmail = true,
-        //                SavePassword = true,
-        //                UserId = string.Empty
-        //            };
-        //            ConfigUtils.PushAccountObject(acc, notPushLastLogin: true);
-        //            AccountObjects.Add(new AccountObjectForRenderer(acc.Email, string.Empty, acc.Id, viewModel.AutoLogin, false));
-        //            NotificationHelper.Success(Localization.AddAccountSuccess);
-        //        }
-        //        finally
-        //        {
-        //            IsAccountBusy = false;
-        //        }
-        //    }
-        //}
-
-        [RelayCommand]
         private void DeleteAccount(Guid innerGuid)
         {
             if (ConfigUtils.IsLastLogin(innerGuid))
@@ -238,27 +105,13 @@ namespace Celestite.ViewModels.Pages
                     return;
                 }
 
-                HttpHelper.ClearCookies();
-                SessionIdResponse session;
-                var isValid = await DmmOpenApiHelper.CheckValidity(accountObject.LoginSecureId, accountObject.LoginSessionId);
-                if (isValid)
+                if (!await DmmOpenApiHelper.CheckValidity(accountObject.LoginSecureId, accountObject.LoginSessionId))
                 {
-                    session = new SessionIdResponse { SecureId = accountObject.LoginSecureId, UniqueId = accountObject.LoginSessionId };
-                }
-                else
-                {
-                    var loginResponse = await DmmOpenApiHelper.LegacyLogin(accountObject.Email, accountObject.Password);
-                    if (loginResponse.Failed)
-                    {
-                        NotificationHelper.Warn(loginResponse.Error!.Reason);
-                        return;
-                    }
-                    session = loginResponse.Value;
-                    accountObject.LoginSecureId = session.SecureId;
-                    accountObject.LoginSessionId = session.UniqueId;
+                    NotificationHelper.Warn(Localization.BrowserLoginSavedSessionExpired);
+                    return;
                 }
 
-                DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId);
+                DmmGamePlayerApiHelper.SetUserCookies(accountObject.LoginSecureId, accountObject.LoginSessionId);
                 DmmGamePlayerApiHelper.SetAgeCheckDone();
                 ConfigUtils.PushAccountObject(accountObject);
 

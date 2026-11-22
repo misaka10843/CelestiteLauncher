@@ -62,7 +62,6 @@ namespace Celestite.ViewModels
                 NotificationPage => new NotificationPage(),
                 GamesPageId => new GamesPage(),
                 DownloadManagerPageId => new DownloadManagerPage(),
-                MissionPage => new MissionPage(),
                 AccountPage => new AccountPage(),
                 // 未知页
                 _ => throw new InvalidOperationException()

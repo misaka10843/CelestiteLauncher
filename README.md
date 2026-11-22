@@ -8,7 +8,7 @@
 * 在日本以外的国家/地区使用 **DMMGamePlayer** 的功能[^1]。
 * 自定义游戏启动命令行。
 * 在非 Windows 系统上使用 Proton/Wine 等 Windows 兼容层启动游戏。
-* 通过模拟启动流程完成 DMM POINT GET MISSION 的任务。
+* 从导航栏打开 DMM 的 GAMES 任务官网。
 * 以无 GUI 模式执行游戏启动流程。
 * (Windows) 在基于 WebView2 的内置浏览器上以账号隔离的方式运行浏览器游戏。
   
@@ -22,10 +22,20 @@
 要使用 **Celestite**，建议您在 [Releases](https://github.com/Kengxxiao/CelestiteLauncher/releases) 中下载对应系统的最新版本。  
 由于启动器本体不包含更新检查功能，因此建议您在 Github 上定期检查是否有针对 BUG 的软件更新。
 
+使用登录页的 **DMM 网页授权登录** 登录。登录页和设置页都可以保存启动器代理，支持 HTTP、HTTPS 和 SOCKS5。外部浏览器使用自己的代理设置。
+
+Windows 下可运行 `Celestite.Desktop.exe --register-dmm-protocol`，将当前用户的 DMM 网页授权回调和游戏链接关联到这份 Celestite。
+
+启用游戏代理选项后，Celestite 会将 `HTTP_PROXY`、`HTTPS_PROXY` 和 `ALL_PROXY` 传给它直接启动的非提权游戏进程。游戏需要支持这些环境变量才能使用代理。
+
 ## 高级启动
 可以使用一些特定的命令行参数使 **Celestite** 自动执行某些功能。
 * ```--nogui``` 启用无 GUI 模式，该模式在运行完成后自动退出。
-* ```--username <username> --password <password>``` 在无 GUI 模式下定义要登录的 DMM 用户名和密码，如果不使用那么 **Celestite** 会使用上次在 GUI 模式下已经成功登录的账号（使用无 GUI 模式登录的账号不会被保存）。
+* 无 GUI 模式使用仍有效的已保存会话。网页授权用户可向正在运行且已登录的 Celestite 传递游戏启动指令。
 * ```--productId <productId> --type <type>``` 要求 **Celestite** 直接启动某个游戏。如果 **Celestite** 未在后台运行，那么启动指令将会在登录成功后开始执行；反之，启动指令将会被传递给正在运行的 **Celestite** 实例执行。
 ### 示例
-* ```Celestite.Desktop.exe --nogui --username example@example.com --password example --productId mementomori --type GCL``` 代表在无 GUI 模式下使用邮箱为 example@example.com 的账号登录 DMM 后启动本地的 MementoMori 游戏。
+* ```Celestite.Desktop.exe --productId mementomori --type GCL``` 向 Celestite 发送启动 MementoMori 的指令。
+
+## 手动发版
+
+在 GitHub 仓库的 **Actions** 中选择 **Release Celestite**，点击 **Run workflow**，选择分支并填写新的版本标签（例如 `v2.0.0`）。流程会构建 Windows x64 的 .NET 10 Native AOT 包，并将 ZIP 上传到对应的 GitHub Release。

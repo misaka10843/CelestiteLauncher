@@ -294,7 +294,6 @@ namespace Celestite.Utils
         public static bool UseMica() => _config.BaseSection.UseMica;
         public static bool UseAcrylic() => _config.BaseSection.UseAcrylic;
         public static bool GetMinimizeToTray() => _config.BaseSection.MinimizeToTray;
-        public static bool GetHimariProxyStatus() => _config.BaseSection.EnableHimariProxy;
         public static bool GetBypassSystemProxy() => _config.BaseSection.BypassSystemProxy;
         public static string GetLanguageCode() => _config.BaseSection.Locale;
         public static bool GetEnableEmbeddedWebView() => _config.BaseSection.EnableEmbeddedWebView;
@@ -318,11 +317,6 @@ namespace Celestite.Utils
             Save();
         }
 
-        public static void SetHimariProxyStatus(bool value)
-        {
-            _config.BaseSection.EnableHimariProxy = value;
-            Save();
-        }
         public static void SetBypassSystemProxy(bool value)
         {
             _config.BaseSection.BypassSystemProxy = value;

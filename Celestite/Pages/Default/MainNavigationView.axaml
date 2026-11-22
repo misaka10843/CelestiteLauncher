@@ -13,7 +13,7 @@
 		<fluent:NavigationView.MenuItems>
 			<fluent:NavigationViewItem Content="{x:Static locale:Localization.LeftNavGames}" Tag="GamesPage" IconSource="Games"/>
 			<fluent:NavigationViewItem Content="{x:Static locale:Localization.LeftNavNotifications}" Tag="NotificationPage" IconSource="Alert"/>
-			<fluent:NavigationViewItem Content="{x:Static locale:Localization.LeftMissions}" Tag="MissionPage" IconSource="Book"/>
+			<fluent:NavigationViewItem Content="{x:Static locale:Localization.LeftMissions}" Tag="MissionPage" IconSource="Book" SelectsOnInvoked="False"/>
 			<fluent:NavigationViewItem Content="{x:Static locale:Localization.HeaderAccount}" Tag="AccountPage" IconSource="Person"/>
 			<!--fluent:NavigationViewItem Content="测试页面" Tag="HomePage" IconSource="Home"/-->
 		</fluent:NavigationView.MenuItems>

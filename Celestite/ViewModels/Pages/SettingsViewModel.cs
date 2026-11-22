@@ -38,7 +38,6 @@ namespace Celestite.ViewModels.Pages
         [ObservableProperty] private bool _useMica = ConfigUtils.UseMica();
         [ObservableProperty] private bool _useAcrylic = ConfigUtils.UseAcrylic();
         [ObservableProperty] private bool _minimizeToTray = ConfigUtils.GetMinimizeToTray();
-        [ObservableProperty] private bool _himariProxy = ConfigUtils.GetHimariProxyStatus();
         [ObservableProperty] private bool _banSystemProxy = ConfigUtils.GetBypassSystemProxy();
         [ObservableProperty] private string _languageCode = ConfigUtils.GetLanguageCode();
         [ObservableProperty] private bool _enableEmbeddedWebView = ConfigUtils.GetEnableEmbeddedWebView();
@@ -97,7 +96,6 @@ namespace Celestite.ViewModels.Pages
         partial void OnUseAcrylicChanged(bool value) => ConfigUtils.SetAcrylic(value);
 
         partial void OnMinimizeToTrayChanged(bool value) => ConfigUtils.SetMinimizeToTray(value);
-        partial void OnHimariProxyChanged(bool value) => ConfigUtils.SetHimariProxyStatus(value);
         partial void OnBanSystemProxyChanged(bool value) => ConfigUtils.SetBypassSystemProxy(value);
         partial void OnEnableEmbeddedWebViewChanged(bool value) => ConfigUtils.SetEnableEmbeddedWebView(value);
         partial void OnDisableIFrameExChanged(bool value) => ConfigUtils.SetDisableIFrameEx(value);

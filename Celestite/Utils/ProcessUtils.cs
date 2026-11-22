@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using Celestite.I18N;
+using Celestite.Network.DynamicProxy;
 using Celestite.ViewModels.WebBrowser;
 using Cysharp.Text;
 
@@ -23,6 +24,10 @@ namespace Celestite.Utils
 
         public static ProcessFailedReason CreateProcess(string path, string arguments, out Process? p, out Exception? systemReason,
             bool isAdministrator = false)
+            => CreateProcess(path, arguments, out p, out systemReason, isAdministrator, string.Empty);
+
+        private static ProcessFailedReason CreateProcess(string path, string arguments, out Process? p, out Exception? systemReason,
+            bool isAdministrator, string proxyAddress)
         {
             systemReason = null;
             p = null;
@@ -37,6 +42,16 @@ namespace Celestite.Utils
                 process.Verb = "runas";
             process.Arguments = arguments;
             process.UseShellExecute = true;
+            if (!isAdministrator && proxyAddress.Length > 0)
+            {
+                process.UseShellExecute = false;
+                foreach (string key in new[] { "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY" })
+                {
+                    process.Environment[key] = proxyAddress;
+                    if (!OperatingSystem.IsWindows())
+                        process.Environment[key.ToLowerInvariant()] = proxyAddress;
+                }
+            }
 
             try
             {
@@ -61,10 +76,13 @@ namespace Celestite.Utils
                 commandLine.Append(" ");
                 commandLine.Append(extraCommandLine);
             }
-            return LaunchProcess(path, commandLine.ToString(), out process, isAdministrator, direct);
+            return LaunchProcess(path, commandLine.ToString(), out process, isAdministrator, direct, DynamicProxyImpl.GetGameProxyAddress());
         }
 
         public static ProcessFailedReason LaunchProcess(string path, string argument, out Process? process, bool isAdministrator = false, bool direct = false)
+            => LaunchProcess(path, argument, out process, isAdministrator, direct, string.Empty);
+
+        private static ProcessFailedReason LaunchProcess(string path, string argument, out Process? process, bool isAdministrator, bool direct, string proxyAddress)
         {
             if (!OperatingSystem.IsWindows() && !direct)
             {
@@ -76,10 +94,10 @@ namespace Celestite.Utils
                     return ProcessFailedReason.Success;
                 }
 
-                argument = $"{path} {argument}";
+                argument = $"\"{path}\" {argument}";
                 path = winePath;
             }
-            var result = CreateProcess(path, argument, out process, out var reason, isAdministrator);
+            var result = CreateProcess(path, argument, out process, out var reason, isAdministrator, proxyAddress);
             if (result == ProcessFailedReason.SystemFailed)
                 NotificationHelper.Warn(reason!.Message);
             else if (result == ProcessFailedReason.FileNotExists)

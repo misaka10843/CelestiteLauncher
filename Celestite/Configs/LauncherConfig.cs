@@ -306,6 +306,7 @@ namespace Celestite.Configs
         [MemoryPackOrder(2)] public bool UseMica { get; set; } = true;
         [MemoryPackOrder(3)] public bool UseAcrylic { get; set; } = false;
         [MemoryPackOrder(4)] public bool MinimizeToTray { get; set; } = false;
+        // Retained for compatibility with existing MemoryPack config files.
         [MemoryPackOrder(5)] public bool EnableHimariProxy { get; set; } = false;
         [MemoryPackOrder(6)] public bool BypassSystemProxy { get; set; } = false;
         [MemoryPackOrder(7)] public bool EnableEmbeddedWebView { get; set; } = false;

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Celestite.ViewModels;
+using Celestite.Utils;
 using FluentAvalonia.Core;
 using FluentAvalonia.UI.Controls;
 using FluentAvalonia.UI.Navigation;
@@ -37,6 +38,11 @@ public partial class MainNavigationView : UserControl
     private void OnNavigationViewItemInvoked(object sender, NavigationViewItemInvokedEventArgs e)
     {
         if (e.InvokedItemContainer is not NavigationViewItem navigationViewItem) return;
+        if (navigationViewItem.TagHash == NavigationFactory.MissionPage)
+        {
+            ProcessUtils.OpenExternalLink("https://mission.games.dmm.com/", forceExternal: true);
+            return;
+        }
         navigationViewItem.IsSelected = true;
         NavigationFactory.Instance.Navigate(navigationViewItem.TagHash);
     }

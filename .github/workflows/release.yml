@@ -1,0 +1,70 @@
+name: Release Celestite
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (for example v2.0.0)
+        required: true
+        type: string
+      prerelease:
+        description: Mark as prerelease
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish Native AOT
+        run: dotnet publish Celestite.Desktop/Celestite.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -p:StripSymbols=true -p:DebugType=None -p:DebugSymbols=false -o publish
+      - name: Archive Windows distribution
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath Celestite-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Celestite-win-x64
+          path: Celestite-win-x64.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Celestite-win-x64
+          path: release-assets
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[[:alnum:].-]+)?$ ]]; then
+            echo "Invalid release tag" >&2
+            exit 1
+          fi
+          if gh api "repos/${GH_REPO}/git/ref/tags/${RELEASE_TAG}" --silent 2>/dev/null; then
+            echo "Tag already exists: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          flags=()
+          if [[ "$PRERELEASE" == true ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" release-assets/Celestite-win-x64.zip --target "$GITHUB_SHA" --generate-notes "${flags[@]}"
