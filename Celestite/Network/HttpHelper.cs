@@ -30,7 +30,6 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.Versioning;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -44,7 +43,6 @@ using TurnerSoftware.DinoDNS;
 using TurnerSoftware.DinoDNS.Protocol;
 using TurnerSoftware.DinoDNS.Protocol.ResourceRecords;
 using ZeroLog;
-[assembly: RequiresPreviewFeatures]
 
 namespace Celestite.Network
 {

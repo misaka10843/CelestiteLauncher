@@ -171,7 +171,8 @@ namespace Celestite.Network
             };
             var authResponse = await HttpHelper.PostFormDataAsync(ApiBaseUrl, "/service/login/password/authenticate", authPayload);
             if (authResponse.Failed) return DmmOpenApiResult.Fail<SessionIdResponse>(authResponse.Exception);
-            if (!authResponse.Value.IsSuccessStatusCode)
+            bool redirected = authResponse.Value.StatusCode == HttpStatusCode.Found;
+            if (!authResponse.Value.IsSuccessStatusCode && !redirected)
                 return DmmOpenApiResult.Fail<SessionIdResponse>(new Exception($"Error auth response code: {authResponse.Value.StatusCode}"));
 
             var cookies = HttpHelper.GlobalCookieContainer.GetAllCookies().Where(c => !c.Expired);
@@ -179,6 +180,9 @@ namespace Celestite.Network
             {
                 string loginSecureId = cookies.Single(x => x.Name == "login_secure_id").Value;
                 string loginSessionId = cookies.Single(x => x.Name == "login_session_id").Value;
+                if (redirected && !await CheckValidity(loginSecureId, loginSessionId))
+                    return DmmOpenApiResult.Fail<SessionIdResponse>("DMM redirected the login request without issuing a valid Game Player session.");
+
                 return DmmOpenApiResult.Ok(new SessionIdResponse
                 {
                     SecureId = loginSecureId,
@@ -187,6 +191,9 @@ namespace Celestite.Network
             }
             catch (Exception e)
             {
+                if (redirected)
+                    return DmmOpenApiResult.Fail<SessionIdResponse>("DMM redirected the login request without returning a usable session.");
+
                 return DmmOpenApiResult.Fail<SessionIdResponse>(new Exception($"Failed to get loginSecureId or loginSessionId, {e.Message}"));
             }
         }
