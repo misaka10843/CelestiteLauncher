@@ -1,5 +1,10 @@
 {
   "LoginSubtitle": "Login to DMM.com",
+  "BrowserLoginTitle": "Sign in with DMM in browser",
+  "BrowserLoginWaiting": "Finish signing in with DMM in your browser and allow it to open Celestite.",
+  "BrowserLoginDescription": "After signing in, paste the address of the DMM login success page here",
+  "BrowserLoginInvalidCallback": "Paste the full address of the DMM login success page.",
+  "BrowserLoginFailed": "DMM browser sign-in failed. Open the sign-in page and try again.",
   "DefaultLoginTitle": "Login",
   "DefaultLoginDescription": "Log in using your email and password for DMM.com",
   "DGPLoginTitle": "One-click login",

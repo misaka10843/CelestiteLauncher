@@ -112,6 +112,7 @@ namespace Celestite.Utils
         }
 
         private static readonly BlockingCollection<string[]> CommandsQueue = [];
+        internal static event Action<Uri>? DmmBrowserCallback;
 
         public static void CreatePipe()
         {
@@ -129,8 +130,19 @@ namespace Celestite.Utils
                         await pipeSever.WaitForConnectionAsync();
                         using var sw = new StreamReader(pipeSever, leaveOpen: true);
                         var commandLine = await sw.ReadToEndAsync();
-                        CommandsQueue.Add(commandLine.Length == 0 ? [] : commandLine.Split('\0'));
+                        var arguments = commandLine.Length == 0 ? [] : commandLine.Split('\0');
                         pipeSever.Disconnect();
+                        if (arguments is ["--scheme", var value] &&
+                            Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == "dmmgameplayer" &&
+                            !uri.AbsolutePath.StartsWith("/cl/", StringComparison.OrdinalIgnoreCase) &&
+                            DmmBrowserCallback is { } browserCallback)
+                        {
+                            browserCallback(uri);
+                        }
+                        else
+                        {
+                            CommandsQueue.Add(arguments);
+                        }
                     }
                     catch (Exception)
                     {

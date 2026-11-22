@@ -170,19 +170,21 @@ namespace Celestite.Network
         // wsapi
         private const string WsApiEndpoint = "https://api-wsdgp.games.dmm.com";
 
-        private const string UserHeaderName = "actauth";
-
         public static void SetUserHeader(string actauth)
         {
-            HttpHelper.SetUserHeader(UserHeaderName, actauth);
+            HttpHelper.ClearCookies();
+            HttpHelper.LoginSecureId = string.Empty;
+            HttpHelper.LoginSessionId = string.Empty;
             HttpHelper.ActAuth = actauth;
             LoginSessionChangedEvent?.Invoke(null, EventArgs.Empty);
         }
 
-        public static void SetUserCookies(string secureId, string sessionId)
+        public static void SetUserCookies(string secureId, string sessionId, bool preserveLoginCookies = false)
         {
+            HttpHelper.ActAuth = string.Empty;
             foreach (Cookie c in HttpHelper.GlobalCookieContainer.GetAllCookies())
-                c.Expired = true;
+                if (!preserveLoginCookies || c.Name is "login_secure_id" or "login_session_id")
+                    c.Expired = true;
             HttpHelper.GlobalCookieContainer.Add([
                 new Cookie("login_secure_id", secureId, "/", ".dmm.com"),
                 new Cookie("login_secure_id", secureId, "/", ".dmm.co.jp"),

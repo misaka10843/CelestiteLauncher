@@ -1,5 +1,10 @@
 {
   "LoginSubtitle": "登录到DMM.com",
+  "BrowserLoginTitle": "DMM 网页授权登录",
+  "BrowserLoginWaiting": "请在浏览器完成 DMM 登录，并允许打开 Celestite。",
+  "BrowserLoginDescription": "在浏览器完成登录后，将登录成功页面的地址粘贴到这里",
+  "BrowserLoginInvalidCallback": "请粘贴 DMM 登录成功页面的完整地址。",
+  "BrowserLoginFailed": "DMM 网页授权失败，请重新打开授权页并完成登录。",
   "DefaultLoginTitle": "登录",
   "DefaultLoginDescription": "使用DMM.com的邮箱和密码进行登录",
   "DGPLoginTitle": "一键登录",

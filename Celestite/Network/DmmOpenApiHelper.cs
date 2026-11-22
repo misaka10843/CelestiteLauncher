@@ -169,33 +169,63 @@ namespace Celestite.Network
                 { "path", pathMatch.Groups[1].Value },
                 { "device", "games-player" }
             };
-            var authResponse = await HttpHelper.PostFormDataAsync(ApiBaseUrl, "/service/login/password/authenticate", authPayload);
+            const string authPath = "/service/login/password/authenticate";
+            var authResponse = await HttpHelper.PostFormDataAsync(ApiBaseUrl, authPath, authPayload);
             if (authResponse.Failed) return DmmOpenApiResult.Fail<SessionIdResponse>(authResponse.Exception);
-            bool redirected = authResponse.Value.StatusCode == HttpStatusCode.Found;
-            if (!authResponse.Value.IsSuccessStatusCode && !redirected)
-                return DmmOpenApiResult.Fail<SessionIdResponse>(new Exception($"Error auth response code: {authResponse.Value.StatusCode}"));
-
-            var cookies = HttpHelper.GlobalCookieContainer.GetAllCookies().Where(c => !c.Expired);
-            try
+            using var auth = authResponse.Value;
+            bool redirected = auth.StatusCode == HttpStatusCode.Found;
+            if (!auth.IsSuccessStatusCode && !redirected)
+                return DmmOpenApiResult.Fail<SessionIdResponse>($"Error auth response code: {auth.StatusCode}");
+            bool landingPageMissing = false;
+            if (redirected)
             {
-                string loginSecureId = cookies.Single(x => x.Name == "login_secure_id").Value;
-                string loginSessionId = cookies.Single(x => x.Name == "login_session_id").Value;
-                if (redirected && !await CheckValidity(loginSecureId, loginSessionId))
-                    return DmmOpenApiResult.Fail<SessionIdResponse>("DMM redirected the login request without issuing a valid Game Player session.");
-
-                return DmmOpenApiResult.Ok(new SessionIdResponse
-                {
-                    SecureId = loginSecureId,
-                    UniqueId = loginSessionId,
-                });
+                var completion = await CompleteLegacyLoginRedirects(new Uri(ApiBaseUrl + authPath), auth.Headers.Location);
+                if (completion.Error != null)
+                    return DmmOpenApiResult.Fail<SessionIdResponse>(completion.Error);
+                landingPageMissing = completion.LandingPageMissing;
             }
-            catch (Exception e)
+
+            var apiCookies = HttpHelper.GlobalCookieContainer.GetCookies(new Uri(HttpHelper.ApiBase));
+            var cookies = HttpHelper.GlobalCookieContainer.GetAllCookies();
+            string? loginSecureId = (apiCookies["login_secure_id"] ?? cookies["login_secure_id"])?.Value;
+            string? loginSessionId = (apiCookies["login_session_id"] ?? cookies["login_session_id"])?.Value;
+            if (string.IsNullOrEmpty(loginSecureId) || string.IsNullOrEmpty(loginSessionId) ||
+                (redirected && !await CheckValidity(loginSecureId, loginSessionId)))
+                return DmmOpenApiResult.Fail<SessionIdResponse>(landingPageMissing
+                    ? "DMM's login redirect returned HTTP 404 and no valid Game Player session was issued."
+                    : "DMM did not issue a usable Game Player session.");
+
+            if (landingPageMissing)
+                LogManager.GetLogger("DmmOpenApi").Warn("DMM's login redirect returned HTTP 404, but Game Player accepted the issued session.");
+
+            return DmmOpenApiResult.Ok(new SessionIdResponse { SecureId = loginSecureId, UniqueId = loginSessionId });
+        }
+
+        private static async UniTask<(string? Error, bool LandingPageMissing)> CompleteLegacyLoginRedirects(Uri currentUri, Uri? location)
+        {
+            for (int hop = 0; hop < 8; hop++)
             {
-                if (redirected)
-                    return DmmOpenApiResult.Fail<SessionIdResponse>("DMM redirected the login request without returning a usable session.");
+                if (location == null || !Uri.TryCreate(currentUri, location, out var nextUri) ||
+                    nextUri.Scheme != Uri.UriSchemeHttps || !nextUri.IsDefaultPort || nextUri.UserInfo.Length != 0)
+                    return ("DMM returned an unsupported login redirect.", false);
 
-                return DmmOpenApiResult.Fail<SessionIdResponse>(new Exception($"Failed to get loginSecureId or loginSessionId, {e.Message}"));
+                string host = nextUri.IdnHost;
+                if (host is not ("dmm.com" or "dmm.co.jp") &&
+                    !host.EndsWith(".dmm.com", StringComparison.OrdinalIgnoreCase) &&
+                    !host.EndsWith(".dmm.co.jp", StringComparison.OrdinalIgnoreCase))
+                    return ("DMM redirected the login outside its account domains.", false);
+
+                var result = await HttpHelper.GetResponseHeaderAsync(nextUri);
+                if (result.Failed) return ("Unable to complete the DMM login redirect.", false);
+                using var response = result.Value;
+                if (response.IsSuccessStatusCode) return (null, false);
+                if (response.StatusCode == HttpStatusCode.NotFound) return (null, true);
+                if (response.StatusCode is not (HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther))
+                    return ($"DMM login redirect failed with HTTP {(int)response.StatusCode}.", false);
+                currentUri = nextUri;
+                location = response.Headers.Location;
             }
+            return ("DMM login exceeded the redirect limit.", false);
         }
 
         //public static async UniTask<DmmOpenApiResult<TokenResponse>> Login(string email, string password)

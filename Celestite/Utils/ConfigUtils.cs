@@ -46,7 +46,8 @@ namespace Celestite.Utils
             IsDgp5Installed = File.Exists(Path.Combine(Dgp5ConfigFilePath, "Local State")) && File.Exists(Path.Combine(Dgp5ConfigFilePath, "Network", "Cookies"));
             DmmGamePlayerApiHelper.UserInfoChangedEvent += (currentUserInfo, _) =>
             {
-                if (currentUserInfo is not UserInfo userInfo || !TryGetLastLogin(out var accountObject) ||
+                if (!string.IsNullOrEmpty(HttpHelper.ActAuth) ||
+                    currentUserInfo is not UserInfo userInfo || !TryGetLastLogin(out var accountObject) ||
                     accountObject == null || userInfo == null) return;
                 var userName = userInfo?.Profile?.Nickname ?? string.Empty;
                 if (accountObject.NickName != userName)

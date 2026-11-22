@@ -28,6 +28,8 @@ namespace Celestite.ViewModels.DefaultVM
         [ObservableProperty] private string _infoBarMessage = string.Empty;
         [ObservableProperty] private InfoBarSeverity _severity = InfoBarSeverity.Warning;
         [ObservableProperty] private bool _canUseLoginButton;
+        [ObservableProperty] private bool _browserLoginPending;
+        [ObservableProperty] private string? _browserLoginCallback;
 
         [ObservableProperty] private bool _isDmmLoginEnabled = ConfigUtils.IsDgp5Installed && OperatingSystem.IsWindows();
 
@@ -84,7 +86,7 @@ namespace Celestite.ViewModels.DefaultVM
             accountObject.LoginSecureId = session.SecureId;
             accountObject.LoginSessionId = session.UniqueId;
             ConfigUtils.PushAccountObject(accountObject);
-            DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId);
+            DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId, preserveLoginCookies: true);
             DmmGamePlayerApiHelper.SetAgeCheckDone();
             return loginResponse;
 
@@ -203,7 +205,7 @@ namespace Celestite.ViewModels.DefaultVM
                     ConfigUtils.PushAccountObject(accountObject);
                 }
 
-                DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId);
+                DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId, preserveLoginCookies: !isValid);
                 DmmGamePlayerApiHelper.SetAgeCheckDone();
                 SetDefaultStatus();
                 await ProcessUser();
@@ -280,6 +282,112 @@ namespace Celestite.ViewModels.DefaultVM
         private async Task ShowRegisterButton()
         {
             await RegisterFormDialog.ShowAsync();
+        }
+
+        [RelayCommand]
+        private async Task ShowBrowserLogin()
+        {
+            SetLoginStatus();
+            var authorization = await DmmGamePlayerApiHelper.GetAuthLoginUrl();
+            if (authorization.Failed || !Uri.TryCreate(authorization.Value?.Url, UriKind.Absolute, out var loginUrl) ||
+                loginUrl.Scheme != Uri.UriSchemeHttps || loginUrl.Host != "accounts.dmm.com" ||
+                !loginUrl.IsDefaultPort || loginUrl.UserInfo.Length != 0)
+            {
+                _logger.Warn("DMM browser sign-in could not obtain a valid authorization URL.");
+                SetLoginErrorStatus(Localization.BrowserLoginFailed);
+                return;
+            }
+
+            try
+            {
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    BrowserLoginPending = true;
+                    CommandLineHelper.DmmBrowserCallback += ReceiveBrowserLoginCallback;
+                    InfoBarMessage = Localization.BrowserLoginWaiting;
+                });
+                await Task.Run(() => ProcessUtils.OpenExternalLink(loginUrl.AbsoluteUri, forceExternal: true));
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn("DMM browser sign-in could not open the browser.", ex);
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    EndBrowserLogin();
+                    SetLoginErrorStatus(Localization.BrowserLoginFailed);
+                });
+            }
+        }
+
+        private void ReceiveBrowserLoginCallback(Uri uri) => Dispatcher.UIThread.Post(() =>
+        {
+            if (!BrowserLoginPending) return;
+            if (GetBrowserLoginCode(uri) is not { } code)
+            {
+                _logger.Warn($"DMM browser callback did not contain a recognized authorization code (query present: {uri.Query.Length > 0}).");
+                return;
+            }
+            CompleteBrowserLogin(code).AsUniTask().Forget();
+        });
+
+        [RelayCommand]
+        private Task SubmitBrowserLogin()
+        {
+            if (!BrowserLoginPending) return Task.CompletedTask;
+            var code = Uri.TryCreate(BrowserLoginCallback?.Trim(), UriKind.Absolute, out var uri) ? GetBrowserLoginCode(uri) : null;
+            if (code == null)
+            {
+                InfoBarMessage = Localization.BrowserLoginInvalidCallback;
+                Severity = InfoBarSeverity.Error;
+                return Task.CompletedTask;
+            }
+            return CompleteBrowserLogin(code);
+        }
+
+        [RelayCommand]
+        private void CancelBrowserLogin()
+        {
+            EndBrowserLogin();
+            SetDefaultStatus();
+        }
+
+        private void EndBrowserLogin()
+        {
+            CommandLineHelper.DmmBrowserCallback -= ReceiveBrowserLoginCallback;
+            BrowserLoginPending = false;
+            BrowserLoginCallback = null;
+        }
+
+        private async Task CompleteBrowserLogin(string code)
+        {
+            EndBrowserLogin();
+            SetLoginStatus();
+            var token = await DmmGamePlayerApiHelper.IssueAccessToken(code);
+            if (token.Failed || string.IsNullOrWhiteSpace(token.Value?.AccessToken))
+            {
+                _logger.Warn($"DMM browser sign-in failed at token exchange (result: {token.ErrorCode}).");
+                SetLoginErrorStatus(Localization.BrowserLoginFailed);
+                return;
+            }
+
+            DmmGamePlayerApiHelper.SetUserHeader(token.Value.AccessToken);
+            DmmGamePlayerApiHelper.SetAgeCheckDone();
+            SetDefaultStatus();
+            await ProcessUser();
+        }
+
+        private static string? GetBrowserLoginCode(Uri uri)
+        {
+            if (!uri.IsDefaultPort || uri.UserInfo.Length != 0)
+                return null;
+            if (uri.Scheme != "dmmgameplayer" &&
+                !(uri.Scheme == Uri.UriSchemeHttps && uri.Host == "webdgp-gameplayer.games.dmm.com" && uri.AbsolutePath == "/login/success"))
+                return null;
+
+            var code = System.Web.HttpUtility.ParseQueryString(uri.Query).GetValues("code");
+            return code is [var value] && !string.IsNullOrWhiteSpace(value) && value.Length <= 512 && !value.Contains(',')
+                ? value
+                : null;
         }
 
         [RelayCommand]

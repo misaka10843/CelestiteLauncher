@@ -90,6 +90,7 @@ namespace Celestite.Network
 
         public static void ClearCookies()
         {
+            ActAuth = string.Empty;
             foreach (var c in (ICollection<Cookie>)GlobalCookieContainer.GetAllCookies())
                 c.Expired = true;
         }
@@ -307,6 +308,13 @@ namespace Celestite.Network
 
         public const string ApiBase = "https://apidgp-gameplayer.games.dmm.com";
 
+        private static void AddGamePlayerAuthorization(HttpRequestMessage request)
+        {
+            var token = ActAuth;
+            if (!string.IsNullOrEmpty(token) && request.RequestUri is { Scheme: "https", IsDefaultPort: true, Host: "apidgp-gameplayer.games.dmm.com" })
+                request.Headers.Add("actauth", token);
+        }
+
         public static async UniTask<NetworkOperationResult<TResp>> DgpGetJsonAsync<TResp>(string path,
             JsonTypeInfo<TResp> jsonTypeInfo, CancellationToken cancellationToken = default,
             [System.Runtime.CompilerServices.CallerMemberName] string operation = "") where TResp : class
@@ -324,6 +332,7 @@ namespace Celestite.Network
             {
                 var url = ZString.Concat(baseUrl, path);
                 using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                AddGamePlayerAuthorization(request);
                 if (!string.IsNullOrEmpty(referer))
                     request.Headers.TryAddWithoutValidation("Referer", referer);
                 if (!string.IsNullOrEmpty(xAccessFrom))
@@ -659,6 +668,7 @@ namespace Celestite.Network
                 using var content = JsonContent.Create(request, requestJsonTypeInfo);
                 requestMessage.Headers.TryAddWithoutValidation("User-Agent",
                     forceMobileUserAgent ? MobileUa : SystemInfoUtils.RequestHeaderUserAgentName);
+                AddGamePlayerAuthorization(requestMessage);
                 requestMessage.Content = content;
 
                 if (addSessionId && !string.IsNullOrEmpty(LoginSecureId) && !string.IsNullOrEmpty(LoginSessionId))
@@ -686,7 +696,9 @@ namespace Celestite.Network
             {
                 using var httpContent = new StringContent(string.Empty);
                 var url = ZString.Concat(baseUrl, path);
-                using var httpResponse = await MainHttpClient.PostAsync(url, httpContent, cancellationToken).ConfigureAwait(false);
+                using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = httpContent };
+                AddGamePlayerAuthorization(request);
+                using var httpResponse = await MainHttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 httpResponse.EnsureSuccessStatusCode();
                 var jsonResponse = await httpResponse.Content.ReadFromJsonAsync(responseJsonTypeInfo, cancellationToken).ConfigureAwait(false);
                 return jsonResponse == null ? NetworkOperationResult.Fail<TResp>(new NoNullAllowedException()) : NetworkOperationResult.Ok(jsonResponse);
@@ -825,7 +837,7 @@ namespace Celestite.Network
                 using var request = new HttpRequestMessage(HttpMethod.Post, url);
                 using var content = new FormUrlEncodedContent(postData);
                 request.Content = content;
-                using var response = await MainHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                var response = await MainHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 return NetworkOperationResult.Ok(response);
             }
             catch (Exception ex)
