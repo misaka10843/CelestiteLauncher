@@ -27,16 +27,7 @@ namespace Celestite.Utils
 
             if (OperatingSystem.IsWindows())
             {
-                using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Classes\celestite");
-                key.SetValue("URL Protocol", string.Empty);
-
-                using var defaultIcon = key.CreateSubKey("DefaultIcon");
-                defaultIcon.SetValue(string.Empty, currentFile);
-
-                using var shell = key.CreateSubKey("shell");
-                using var open = shell.CreateSubKey("open");
-                using var command = open.CreateSubKey("command");
-                command.SetValue(string.Empty, $"{currentFile} --scheme %1");
+                RegisterWindowsUriScheme("celestite", currentFile);
             }
             else if (OperatingSystem.IsLinux())
             {
@@ -81,7 +72,46 @@ namespace Celestite.Utils
             }
         }
 
-        private static readonly BlockingCollection<string> CommandsQueue = [];
+        public static void RegisterDmmUriScheme()
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            RegisterWindowsUriScheme("dmmgameplayer", Environment.ProcessPath!);
+        }
+
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        private static void RegisterWindowsUriScheme(string scheme, string executable)
+        {
+            using var key = Registry.CurrentUser.CreateSubKey($@"SOFTWARE\Classes\{scheme}");
+            key.SetValue(string.Empty, $"URL:{scheme} Protocol");
+            key.SetValue("URL Protocol", string.Empty);
+            using var icon = key.CreateSubKey("DefaultIcon");
+            icon.SetValue(string.Empty, $"\"{executable}\",0");
+            using var command = key.CreateSubKey(@"shell\open\command");
+            command.SetValue(string.Empty, $"\"{executable}\" --scheme \"%1\"");
+        }
+
+        public static async UniTask<bool> HandleDmmUri(Uri uri)
+        {
+            if (uri.Scheme != "dmmgameplayer" || uri.UserInfo.Length != 0 || !uri.IsDefaultPort ||
+                uri.Host.Length == 0 || !uri.Host.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+                return false;
+
+            switch (uri.AbsolutePath)
+            {
+                case "/cl/general":
+                case "/cl/general/":
+                    await LaunchHelper.LaunchGame(uri.Host, TApiGameType.GCL, checkGameExist: true);
+                    return true;
+                case "/cl/adult":
+                case "/cl/adult/":
+                    await LaunchHelper.LaunchGame(uri.Host, TApiGameType.ACL, checkGameExist: true);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static readonly BlockingCollection<string[]> CommandsQueue = [];
 
         public static void CreatePipe()
         {
@@ -99,7 +129,7 @@ namespace Celestite.Utils
                         await pipeSever.WaitForConnectionAsync();
                         using var sw = new StreamReader(pipeSever, leaveOpen: true);
                         var commandLine = await sw.ReadToEndAsync();
-                        CommandsQueue.Add(commandLine);
+                        CommandsQueue.Add(commandLine.Length == 0 ? [] : commandLine.Split('\0'));
                         pipeSever.Disconnect();
                     }
                     catch (Exception)
@@ -113,7 +143,7 @@ namespace Celestite.Utils
         private static void DmmGamePlayerApiHelper_LoginSessionChangedEvent(object? sender, EventArgs e)
         {
             DmmGamePlayerApiHelper.LoginSessionChangedEvent -= DmmGamePlayerApiHelper_LoginSessionChangedEvent;
-            CommandsQueue.Add(Environment.CommandLine);
+            CommandsQueue.Add(Environment.GetCommandLineArgs()[1..]);
             UniTask.Run(async () =>
             {
                 while (true)
@@ -125,9 +155,8 @@ namespace Celestite.Utils
             }).Forget();
         }
 
-        public static async UniTask ParseCommandLine(string cmd)
+        private static async UniTask ParseCommandLine(string[] commands)
         {
-            var commands = cmd.Split(' ');
             var parserResult = await Parser.Default.ParseArguments<LaunchCommandLine>(commands)
                 .WithParsedAsync(async (c) => await LaunchCall(c));
             if (string.IsNullOrEmpty(parserResult.Value.Scheme) && string.IsNullOrEmpty(parserResult.Value.ProductId) && string.IsNullOrEmpty(parserResult.Value.GameType))
@@ -141,7 +170,12 @@ namespace Celestite.Utils
                 try
                 {
                     var uri = new Uri(launchCommandLine.Scheme);
-                    if (uri.Authority is "launch" or "emulaunch")
+                    if (uri.Scheme == "dmmgameplayer")
+                    {
+                        if (!await HandleDmmUri(uri))
+                            Console.WriteLine("Unsupported DMM game link.");
+                    }
+                    else if (uri.Scheme == "celestite" && uri.Authority is "launch" or "emulaunch")
                     {
                         var param = uri.AbsolutePath.Split('/');
                         if (param.Length < 3 || !string.IsNullOrEmpty(param[0]))
@@ -333,7 +367,7 @@ namespace Celestite.Utils
                     {
                         using var pipeClient = new NamedPipeClientStream(".", $"{Environment.UserName}_celestite", PipeDirection.Out);
                         pipeClient.Connect();
-                        var bytes = Encoding.UTF8.GetBytes(Environment.CommandLine);
+                        var bytes = Encoding.UTF8.GetBytes(string.Join('\0', args));
                         pipeClient.Write(bytes, 0, bytes.Length);
                         Environment.Exit(0);
                         return;

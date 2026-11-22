@@ -143,13 +143,8 @@ namespace Celestite.ViewModels.Pages
                 }
             };
 
-            if (OperatingSystem.IsWindows() && DmmGamePlayerApiHelper.CurrentUserInfo != null)
-                Carleen.UpdateCurrentUser(DmmGamePlayerApiHelper.CurrentUserInfo.OpenId, HttpHelper.LoginSecureId, HttpHelper.LoginSessionId);
-            DmmGamePlayerApiHelper.UserInfoChangedEvent += (currentUserInfo, _) =>
-            {
-                if (OperatingSystem.IsWindows() && currentUserInfo is UserInfo userInfo)
-                    Carleen.UpdateCurrentUser(userInfo.OpenId, HttpHelper.LoginSecureId, HttpHelper.LoginSessionId);
-            };
+            UpdateEmbeddedBrowserUser(DmmGamePlayerApiHelper.CurrentUserInfo);
+            DmmGamePlayerApiHelper.UserInfoChangedEvent += (currentUserInfo, _) => UpdateEmbeddedBrowserUser(currentUserInfo as UserInfo);
 
             GamesSource.CollectionChanged += (_, e) =>
             {
@@ -159,6 +154,20 @@ namespace Celestite.ViewModels.Pages
             };
 
             RemoteUpdate();
+        }
+
+        private static void UpdateEmbeddedBrowserUser(UserInfo? userInfo)
+        {
+            if (!OperatingSystem.IsWindows() || userInfo == null) return;
+
+            try
+            {
+                Carleen.UpdateCurrentUser(userInfo.OpenId, HttpHelper.LoginSecureId, HttpHelper.LoginSessionId);
+            }
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+            {
+                ZeroLog.LogManager.GetLogger("WebView").Warn("Embedded browser session synchronization is unavailable.", ex);
+            }
         }
 
         private void GamesShouldBeChanged()

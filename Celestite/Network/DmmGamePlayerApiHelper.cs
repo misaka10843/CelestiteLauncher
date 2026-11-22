@@ -37,45 +37,25 @@ namespace Celestite.Network
 
         public static event EventHandler<DmmGamePlayerApiErrorEventArgs>? NotBroadcastErrorOccured;
         protected DmmGamePlayerApiResult(DmmGamePlayerApiErrorCode errorCode, string? error)
+            : this(errorCode, error, null, default)
         {
-            var success = errorCode == DmmGamePlayerApiErrorCode.SUCCESS;
-            switch (success)
-            {
-                case true when error != null:
-                    throw new InvalidOperationException();
-                case false when error == null:
-                    throw new InvalidOperationException();
-            }
-
-            ErrorCode = errorCode;
-            ErrorMessage = error;
-
-            if (success) return;
-            Logger.Warn(error!);
-            NotificationHelper.Error(error!);
         }
-        protected DmmGamePlayerApiResult(DmmGamePlayerApiErrorCode errorCode, string? error, string productId, TApiGameType gameType)
+        protected DmmGamePlayerApiResult(DmmGamePlayerApiErrorCode errorCode, string? error, string? productId, TApiGameType gameType)
         {
-            var success = errorCode == DmmGamePlayerApiErrorCode.SUCCESS;
-            switch (success)
-            {
-                case true when error != null:
-                    throw new InvalidOperationException();
-                case false when error == null:
-                    throw new InvalidOperationException();
-            }
-
             ErrorCode = errorCode;
-            ErrorMessage = error;
+            if (Success) return;
 
-            if (success) return;
-            if (ErrorCodeNotBroadcast.Contains(errorCode))
+            ErrorMessage = string.IsNullOrWhiteSpace(error)
+                ? $"DMM Game Player API error: {errorCode} ({(int)errorCode})"
+                : error;
+
+            if (productId != null && ErrorCodeNotBroadcast.Contains(errorCode))
             {
                 NotBroadcastErrorOccured?.Invoke(null, new DmmGamePlayerApiErrorEventArgs(ErrorCode, productId, gameType));
                 return;
             }
-            Logger.Warn(error!);
-            NotificationHelper.Error(error!);
+            Logger.Warn(ErrorMessage);
+            NotificationHelper.Error(ErrorMessage);
         }
 
         protected DmmGamePlayerApiResult(Exception error)

@@ -21,6 +21,12 @@ internal class Program
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(LaunchCommandLine))]
     public static void Main(string[] args)
     {
+        if (args is ["--register-dmm-protocol"])
+        {
+            CommandLineHelper.RegisterDmmUriScheme();
+            return;
+        }
+
         if (!CommandLineHelper.ParseLaunchCommand(args).GetAwaiter().GetResult()) return;
         CommandLineHelper.CreatePipe();
         GCSettings.LatencyMode = GCLatencyMode.LowLatency;

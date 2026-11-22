@@ -20,7 +20,7 @@ public partial class MainNavigationView : UserControl
 
         var firstControl = (Nav.MenuItems.ElementAt(0) as NavigationViewItem)!;
         firstControl.IsSelected = true;
-        NavigationFactory.Instance.Navigate(firstControl.TagHash);
+        NavigationFactory.Instance.Navigate(firstControl.TagHash, animate: false);
 
         FrameView.Navigated += ScrollToHome;
     }

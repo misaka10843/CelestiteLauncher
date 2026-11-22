@@ -92,36 +92,15 @@ namespace Celestite.ViewModels.WebBrowser
             });
             Carleen.InitLogCallback(_logCallback);
 
-            _uriProcessedCallback = new((uri) =>
-            {
-                var uri2 = new Uri(uri);
-                if (uri2.Scheme == "dmmgameplayer")
-                {
-                    var productId = uri2.Authority;
-                    var param = uri2.AbsolutePath.Split('/');
-                    if (param.Length < 3 || !string.IsNullOrEmpty(param[0]) || param[1] != "cl")
-                    {
-                        logger.Warn($"Unsupported uri: {uri}");
-                        return;
-                    }
-                    var generalType = param[2];
-
-                    switch (generalType)
-                    {
-                        case "general":
-                            LaunchHelper.LaunchGame(productId, Network.Models.TApiGameType.GCL, checkGameExist: true).Forget();
-                            break;
-                        case "adult":
-                            LaunchHelper.LaunchGame(productId, Network.Models.TApiGameType.ACL, checkGameExist: true).Forget();
-                            break;
-                        default:
-                            logger.Warn($"Unsupported uri: {uri}");
-                            break;
-                    }
-                }
-            }
-            );
+            _uriProcessedCallback = new((uri) => ProcessBrowserUri(uri).Forget());
             Carleen.InitUriProcessedCallback(_uriProcessedCallback);
+
+            async UniTask ProcessBrowserUri(string value)
+            {
+                if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == "dmmgameplayer" &&
+                    !await CommandLineHelper.HandleDmmUri(uri))
+                    logger.Warn("Unsupported DMM game link.");
+            }
 
             _tabNavigatingStatusChangedCallback = new((pNativeWindow, tabId, uri, reload) =>
             {

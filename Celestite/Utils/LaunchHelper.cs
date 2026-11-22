@@ -102,12 +102,13 @@ namespace Celestite.Utils
                 var createShortcutAfterUpdate = false;
                 var nextOpenUpdateWindow = false;
 
-                if (ConfigUtils.TryGetContent(productId, type, out var content))
+                ConfigUtils.TryGetContent(productId, type, out var content);
+                if (content?.Detail.Installed == true)
                 {
                     // TODO: 注意需要解析conversion_url
                     var launchCl = await DmmGamePlayerApiHelper.LaunchClGame(productId, type);
                     if (launchCl.Failed) return;
-                    if (content!.Detail.Installed && content.Detail.Version == launchCl.Value.LatestVersion)
+                    if (content.Detail.Version == launchCl.Value.LatestVersion)
                     {
                         var result = ProcessUtils.LaunchProcessWithProductId(productId,
                             Path.Combine(content.Detail.Path, launchCl.Value.ExecFileName), launchCl.Value.ExecuteArgs, out var p,
@@ -146,7 +147,10 @@ namespace Celestite.Utils
                 }
                 packageImageUrl ??= ZString.Format("https://pics.dmm.com/digital/gameplayer/{0}/{0}pt.jpg", productId);
 
-                KashimaDownloadManager.PushDownloadInfo(clInfo, type, ConfigUtils.DmmGamesDefaultInstallFolder, packageImageUrl, nextOpenUpdateWindow,
+                var installDirectory = content?.Detail.Path;
+                if (string.IsNullOrWhiteSpace(installDirectory))
+                    installDirectory = ConfigUtils.DmmGamesDefaultInstallFolder;
+                KashimaDownloadManager.PushDownloadInfo(clInfo, type, installDirectory, packageImageUrl, nextOpenUpdateWindow,
                     launchAfterUpdate, createShortcutAfterUpdate).Forget();
                 return;
             }

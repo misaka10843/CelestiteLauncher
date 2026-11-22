@@ -7,11 +7,15 @@ using Celestite.Pages;
 using Celestite.Pages.Default;
 using Celestite.Utils;
 using FluentAvalonia.UI.Controls;
+using FluentAvalonia.UI.Media.Animation;
+using FluentAvalonia.UI.Navigation;
+using ZeroLog;
 
 namespace Celestite.ViewModels
 {
     public class NavigationFactory : INavigationPageFactory
     {
+        private static readonly Log Logger = LogManager.GetLogger("Navigation");
         private static NavigationFactory? _outerInstance;
         private static NavigationFactory? _instance;
 
@@ -78,13 +82,27 @@ namespace Celestite.ViewModels
             throw new NotImplementedException();
         }
 
-        public void Navigate(uint target)
+        public override void BindFrame(Frame frame)
         {
-            if (NavFrame == null)
-                throw new InvalidOperationException();
-            Dispatcher.UIThread.Invoke(() =>
+            if (NavFrame != null)
+                NavFrame.NavigationFailed -= OnNavigationFailed;
+            base.BindFrame(frame);
+            if (frame != null)
+                frame.NavigationFailed += OnNavigationFailed;
+        }
+
+        private static void OnNavigationFailed(object sender, NavigationFailedEventArgs args) =>
+            Logger.Error("Unable to render a navigation page.", args.Exception);
+
+        public bool Navigate(uint target, bool animate = true)
+        {
+            return Dispatcher.UIThread.Invoke(() =>
             {
-                NavFrame.NavigateFromObject(target);
+                var frame = NavFrame ?? throw new InvalidOperationException();
+                return frame.NavigateFromObject(target, animate ? null : new FrameNavigationOptions
+                {
+                    TransitionInfoOverride = new SuppressNavigationTransitionInfo()
+                });
             });
         }
     }

@@ -308,8 +308,16 @@ namespace Celestite.Network
         public const string ApiBase = "https://apidgp-gameplayer.games.dmm.com";
 
         public static async UniTask<NetworkOperationResult<TResp>> DgpGetJsonAsync<TResp>(string path,
-            JsonTypeInfo<TResp> jsonTypeInfo, CancellationToken cancellationToken = default) where TResp : class
-            => await GetJsonAsync(ApiBase, path, jsonTypeInfo, string.Empty, string.Empty, cancellationToken);
+            JsonTypeInfo<TResp> jsonTypeInfo, CancellationToken cancellationToken = default,
+            [System.Runtime.CompilerServices.CallerMemberName] string operation = "") where TResp : class
+            => TraceDgpLoginRequired(await GetJsonAsync(ApiBase, path, jsonTypeInfo, string.Empty, string.Empty, cancellationToken), operation);
+
+        private static NetworkOperationResult<T> TraceDgpLoginRequired<T>(NetworkOperationResult<T> result, string operation) where T : class
+        {
+            if (!result.Failed && result.Value is Models.DmmGamePlayerApiResponse { ResultCode: Models.DmmGamePlayerApiErrorCode.LOGIN_REQUIRED })
+                Logger.Warn($"DMM Game Player rejected the session during {operation} (203).");
+            return result;
+        }
         public static async UniTask<NetworkOperationResult<TResp>> GetJsonAsync<TResp>(string baseUrl, string path, JsonTypeInfo<TResp> jsonTypeInfo, string referer, string xAccessFrom, CancellationToken cancellationToken = default) where TResp : class
         {
             try
@@ -614,8 +622,9 @@ namespace Celestite.Network
 
         public static async UniTask<NetworkOperationResult<TResp>> DgpPostJson2Async<TReq, TResp>(string path, TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, JsonTypeInfo<TResp> responseJsonTypeInfo, bool forceMobileUserAgent = false, bool addSessionId = false, CancellationToken cancellationToken = default) where TResp : class
             => await PostJsonAsync(ApiBase, path, request, requestJsonTypeInfo, responseJsonTypeInfo, forceMobileUserAgent, addSessionId, cancellationToken);
-        public static async UniTask<NetworkOperationResult<TResp>> DgpPostJsonAsync<TReq, TResp>(string path, TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, JsonTypeInfo<TResp> responseJsonTypeInfo, CancellationToken cancellationToken = default) where TResp : class
-            => await PostJsonAsync(ApiBase, path, request, requestJsonTypeInfo, responseJsonTypeInfo, false, false, cancellationToken);
+        public static async UniTask<NetworkOperationResult<TResp>> DgpPostJsonAsync<TReq, TResp>(string path, TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, JsonTypeInfo<TResp> responseJsonTypeInfo, CancellationToken cancellationToken = default,
+            [System.Runtime.CompilerServices.CallerMemberName] string operation = "") where TResp : class
+            => TraceDgpLoginRequired(await PostJsonAsync(ApiBase, path, request, requestJsonTypeInfo, responseJsonTypeInfo, false, false, cancellationToken), operation);
 
         public static async UniTask<NetworkOperationResult> PostJsonAsync<TReq>(string url,
             TReq request, JsonTypeInfo<TReq> requestJsonTypeInfo, bool useMobileUa = false, string referer = "", CancellationToken cancellationToken = default)

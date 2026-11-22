@@ -161,9 +161,19 @@ namespace Celestite.ViewModels.DefaultVM
                 return;
             }
 
-            NavigationFactory.OuterInstance.Navigate(!userInfo.Value.IsProfileRegistered
-                ? NavigationFactory.DmmProfileReg
-                : NavigationFactory.MainNavigation);
+            uint target = userInfo.Value.IsProfileRegistered
+                ? NavigationFactory.MainNavigation
+                : NavigationFactory.DmmProfileReg;
+            try
+            {
+                if (!NavigationFactory.OuterInstance.Navigate(target, animate: false))
+                    SetLoginErrorStatus("Unable to open the main interface. Check the application log.");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("Unable to open the main interface after login.", ex);
+                SetLoginErrorStatus("Unable to open the main interface. Check the application log.");
+            }
         }
 
         [RelayCommand]
@@ -195,7 +205,9 @@ namespace Celestite.ViewModels.DefaultVM
 
                 DmmGamePlayerApiHelper.SetUserCookies(session.SecureId, session.UniqueId);
                 DmmGamePlayerApiHelper.SetAgeCheckDone();
+                SetDefaultStatus();
                 await ProcessUser();
+                return;
             }
             SetDefaultStatus();
 
@@ -287,8 +299,8 @@ namespace Celestite.ViewModels.DefaultVM
                 }
                 else
                 {
-                    await ProcessUser();
                     SetDefaultStatus();
+                    await ProcessUser();
                 }
             }
         }
@@ -360,8 +372,8 @@ namespace Celestite.ViewModels.DefaultVM
                     DmmGamePlayerApiHelper.SetAgeCheckDone();
 
                     ConfigUtils.ClearLastLogin();
-                    await ProcessUser();
                     SetDefaultStatus();
+                    await ProcessUser();
                 }
                 catch (Exception ex)
                 {
