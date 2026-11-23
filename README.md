@@ -10,7 +10,7 @@
 * 在非 Windows 系统上使用 Proton/Wine 等 Windows 兼容层启动游戏。
 * 从导航栏打开 DMM 的 GAMES 任务官网。
 * 以无 GUI 模式执行游戏启动流程。
-* (Windows) 在基于 WebView2 的内置浏览器上以账号隔离的方式运行浏览器游戏。
+* 浏览并搜索客户端和网页游戏目录，将可入库的游戏添加到账号。网页游戏使用系统默认浏览器打开。
   
 [^1]: 该项功能不包含在开源代码中，需要在 [Releases](https://github.com/Kengxxiao/CelestiteLauncher/releases) 中下载以获得该项功能支持。
 
@@ -23,6 +23,8 @@
 由于启动器本体不包含更新检查功能，因此建议您在 Github 上定期检查是否有针对 BUG 的软件更新。
 
 使用登录页的 **DMM 网页授权登录** 登录。登录页和设置页都可以保存启动器代理，支持 HTTP、HTTPS 和 SOCKS5。外部浏览器使用自己的代理设置。
+
+Windows 会为当前系统用户加密保存网页授权。会话有效时，重新打开启动器会自动登录。会话过期、被 DMM 撤销或在 Celestite 中退出账号后，需要重新授权。
 
 Windows 下可运行 `Celestite.Desktop.exe --register-dmm-protocol`，将当前用户的 DMM 网页授权回调和游戏链接关联到这份 Celestite。
 

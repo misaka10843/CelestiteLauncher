@@ -387,8 +387,10 @@ namespace Celestite.Network
                 DmmGamePlayerApiRequestBaseContext.Default.GameTypeData, DmmGamePlayerApiResponseBaseContext.Default.DmmGamePlayerApiResponse, cancellationToken);
             if (response.Failed)
                 return DmmGamePlayerApiResult.Fail(response.Exception);
-            ReGetGamesRequiredEvent?.Invoke(null, EventArgs.Empty);
-            return DmmGamePlayerApiResult.Ok(response.Value);
+            var result = DmmGamePlayerApiResult.Ok(response.Value);
+            if (result.Success)
+                ReGetGamesRequiredEvent?.Invoke(null, EventArgs.Empty);
+            return result;
         }
 
         public static async UniTask<DmmGamePlayerApiResult> AddStoreProductToMyGame(string productId,

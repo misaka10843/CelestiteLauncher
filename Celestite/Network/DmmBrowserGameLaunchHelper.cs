@@ -24,10 +24,13 @@ namespace Celestite.Network
 
         public record BrowserGameLaunchContext(IEnumerable<string> Scripts, string Schema);
 
+        public static string GetBrowserGameActivationUrl(string productId, bool isNotificationAllowed, bool isDisplayAllowed)
+            => $"https://{ActivateDmmAddress}/{Uri.EscapeDataString(productId)}?isNotificationAllowed={isNotificationAllowed.ToString().ToLowerInvariant()}&isDisplayAllowed={isDisplayAllowed.ToString().ToLowerInvariant()}";
+
         public static async UniTask<bool> TryAddBrowserGame(string productId, bool isNotificationAllowed, bool isDisplayAllowed, bool isSpGame = false)
         {
             using var activateRequest = await HttpHelper.GetAsync(
-                $"https://{ActivateDmmAddress}/{productId}?isNotificationAllowed={isNotificationAllowed.ToString().ToLower()}&isDisplayAllowed={isDisplayAllowed.ToString().ToLower()}", forceMobileUserAgent: isSpGame);
+                GetBrowserGameActivationUrl(productId, isNotificationAllowed, isDisplayAllowed), forceMobileUserAgent: isSpGame);
             if (activateRequest.Failed) return false;
             if (activateRequest.Value.StatusCode == HttpStatusCode.SeeOther) return true;
             NotificationHelper.Warn(Localization.AddBrowserGameFailed);

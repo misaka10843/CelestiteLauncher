@@ -109,13 +109,16 @@ namespace Celestite.Network.Downloader
 
                 if (args.LaunchAfterUpdate)
                 {
+                    NotificationHelper.Info(Localization.GameLaunching);
                     var launchCl = await DmmGamePlayerApiHelper.LaunchClGame(args.ProductId, args.GameType, default);
-                    if (launchCl.Failed) return;
+                    if (LaunchHelper.ReportLaunchApiFailure(launchCl)) return;
 
-                    ProcessUtils.LaunchProcessWithProductId(args.ProductId,
+                    var launchResult = ProcessUtils.LaunchProcessWithProductId(args.ProductId,
                         Path.Combine(content.Detail.Path, launchCl.Value.ExecFileName), launchCl.Value.ExecuteArgs, out var p,
                         launchCl.Value.IsAdministrator);
                     p?.Dispose();
+                    if (launchResult == ProcessFailedReason.Success && p != null)
+                        NotificationHelper.Info(Localization.GameLaunchStarted);
                 }
 
                 if (args.CreateShortcutAfterUpdate)

@@ -25,11 +25,15 @@ namespace Celestite.ViewModels.DefaultVM
 {
     public partial class LoginPageViewModel : ViewModelBase
     {
-        [ObservableProperty] private string _infoBarMessage = string.Empty;
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(HasLoginStatus))]
+        private string _infoBarMessage = string.Empty;
         [ObservableProperty] private InfoBarSeverity _severity = InfoBarSeverity.Warning;
         [ObservableProperty] private bool _canUseLoginButton;
         [ObservableProperty] private bool _browserLoginPending;
-        [ObservableProperty] private string? _browserLoginCallback;
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(CanSubmitBrowserLogin))]
+        private string? _browserLoginCallback;
+        public bool HasLoginStatus => !string.IsNullOrWhiteSpace(InfoBarMessage);
+        public bool CanSubmitBrowserLogin => !string.IsNullOrWhiteSpace(BrowserLoginCallback);
 
         [ObservableProperty] private bool _isDmmLoginEnabled = ConfigUtils.IsDgp5Installed && OperatingSystem.IsWindows();
 
@@ -51,15 +55,32 @@ namespace Celestite.ViewModels.DefaultVM
                 UniTask.Run(() => ProcessAutoLoginCommand.ExecuteAsync(null));
         }
 
-        private async UniTask ProcessUser()
+        private async UniTask ProcessUser(IssueAccessTokenResponse? browserSession = null, bool restoringBrowserSession = false)
         {
             var userInfo = await DmmGamePlayerApiHelper.GetUserInfo();
             if (userInfo.Failed)
             {
-                SetLoginErrorStatus(userInfo.ErrorMessage!);
+                if (restoringBrowserSession)
+                {
+                    HttpHelper.ClearCookies();
+                    if (userInfo.ErrorCode == DmmGamePlayerApiErrorCode.LOGIN_REQUIRED)
+                    {
+                        BrowserSessionStore.Clear();
+                        SetLoginErrorStatus(Localization.BrowserLoginSavedSessionExpired);
+                    }
+                    else
+                        SetLoginErrorStatus(Localization.BrowserLoginRestoreFailed);
+                }
+                else
+                    SetLoginErrorStatus(userInfo.ErrorMessage!);
                 return;
             }
 
+            if (browserSession != null && OperatingSystem.IsWindows() &&
+                !BrowserSessionStore.Save(browserSession.AccessToken, browserSession.ExpiresInSeconds))
+                NotificationHelper.Warn(Localization.BrowserLoginSaveFailed);
+
+            SetDefaultStatus();
             uint target = userInfo.Value.IsProfileRegistered
                 ? NavigationFactory.MainNavigation
                 : NavigationFactory.DmmProfileReg;
@@ -78,6 +99,22 @@ namespace Celestite.ViewModels.DefaultVM
         [RelayCommand]
         private async Task ProcessAutoLogin()
         {
+            if (BrowserSessionStore.Load() is { } browserSession)
+            {
+                SetLoginStatus();
+                if (browserSession.IsExpired)
+                {
+                    BrowserSessionStore.Clear();
+                    SetLoginErrorStatus(Localization.BrowserLoginSavedSessionExpired);
+                    return;
+                }
+
+                DmmGamePlayerApiHelper.SetUserHeader(browserSession.AccessToken);
+                DmmGamePlayerApiHelper.SetAgeCheckDone();
+                await ProcessUser(restoringBrowserSession: true);
+                return;
+            }
+
             if (!ConfigUtils.TryGetLastLogin(out var account) || account?.AutoLogin != true)
             {
                 SetDefaultStatus();
@@ -93,7 +130,6 @@ namespace Celestite.ViewModels.DefaultVM
 
             DmmGamePlayerApiHelper.SetUserCookies(account.LoginSecureId, account.LoginSessionId);
             DmmGamePlayerApiHelper.SetAgeCheckDone();
-            SetDefaultStatus();
             await ProcessUser();
         }
 
@@ -125,7 +161,7 @@ namespace Celestite.ViewModels.DefaultVM
                     CommandLineHelper.DmmBrowserCallback += ReceiveBrowserLoginCallback;
                     InfoBarMessage = Localization.BrowserLoginWaiting;
                 });
-                await Task.Run(() => ProcessUtils.OpenExternalLink(loginUrl.AbsoluteUri, forceExternal: true));
+                await Task.Run(() => ProcessUtils.OpenExternalLink(loginUrl.AbsoluteUri));
             }
             catch (Exception ex)
             {
@@ -191,8 +227,7 @@ namespace Celestite.ViewModels.DefaultVM
 
             DmmGamePlayerApiHelper.SetUserHeader(token.Value.AccessToken);
             DmmGamePlayerApiHelper.SetAgeCheckDone();
-            SetDefaultStatus();
-            await ProcessUser();
+            await ProcessUser(token.Value);
         }
 
         private static string? GetBrowserLoginCode(Uri uri)
@@ -272,11 +307,15 @@ namespace Celestite.ViewModels.DefaultVM
                     ElectronCookie.UpdateCookie(sqlConnection, altHash);
                     ElectronCookie.UpdateCookie(sqlConnection, hasAltHash);
 
+                    if (!BrowserSessionStore.Clear())
+                    {
+                        SetLoginErrorStatus(Localization.BrowserLoginForgetFailed);
+                        return;
+                    }
                     DmmGamePlayerApiHelper.SetUserCookies(loginResult.Value.LoginSecureId, loginResult.Value.LoginSessionId);
                     DmmGamePlayerApiHelper.SetAgeCheckDone();
 
                     ConfigUtils.ClearLastLogin();
-                    SetDefaultStatus();
                     await ProcessUser();
                 }
                 catch (Exception ex)
@@ -368,8 +407,8 @@ namespace Celestite.ViewModels.DefaultVM
         }
         private void SetDefaultStatus()
         {
-            InfoBarMessage = Localization.DGPLoginInfoBarMessage;
-            Severity = InfoBarSeverity.Warning;
+            InfoBarMessage = string.Empty;
+            Severity = InfoBarSeverity.Informational;
             CanUseLoginButton = true;
         }
     }

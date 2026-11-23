@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using Celestite.I18N;
 using Celestite.Network.DynamicProxy;
-using Celestite.ViewModels.WebBrowser;
 using Cysharp.Text;
 
 namespace Celestite.Utils
@@ -107,15 +106,8 @@ namespace Celestite.Utils
             return result;
         }
 
-        public static void OpenExternalLink(string link, bool forceExternal = false)
+        public static void OpenExternalLink(string link)
         {
-            if (Uri.TryCreate(link, new UriCreationOptions(), out var uri) && uri.Scheme is not "http" && uri.Scheme is not "https")
-                forceExternal = true;
-            if (LaunchHelper.IsInGuiMode() && ConfigUtils.GetEnableEmbeddedWebView() && !forceExternal)
-            {
-                WebBrowserViewModel.OpenBrowser(link);
-                return;
-            }
             Process.Start(new ProcessStartInfo(link) { UseShellExecute = true, Verb = "open" });
         }
     }

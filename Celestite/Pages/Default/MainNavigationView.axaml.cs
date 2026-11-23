@@ -40,7 +40,7 @@ public partial class MainNavigationView : UserControl
         if (e.InvokedItemContainer is not NavigationViewItem navigationViewItem) return;
         if (navigationViewItem.TagHash == NavigationFactory.MissionPage)
         {
-            ProcessUtils.OpenExternalLink("https://mission.games.dmm.com/", forceExternal: true);
+            ProcessUtils.OpenExternalLink("https://mission.games.dmm.com/");
             return;
         }
         navigationViewItem.IsSelected = true;

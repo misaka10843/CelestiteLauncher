@@ -11,6 +11,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using Polly.Timeout;
 using ZeroLog;
 
 namespace Celestite.Utils
@@ -25,7 +27,7 @@ namespace Celestite.Utils
             if (gameType.IsCl)
             {
                 var clInfo = await DmmGamePlayerApiHelper.LaunchClGame(productId, gameType.GameType, default);
-                if (clInfo.Failed) return;
+                if (ReportLaunchApiFailure(clInfo)) return;
                 NotificationHelper.Success(Localization.EmuLaunchSuccess);
                 return;
             }
@@ -35,7 +37,34 @@ namespace Celestite.Utils
 
         public static async UniTask LaunchGame(string productId, TApiGameType type, string? packageImageUrl = null, bool checkGameExist = false)
         {
-            // Dispatcher.UIThread.Post(WindowTrayHelper.ReShowWindowCore);
+            try
+            {
+                await LaunchGameCore(productId, type, packageImageUrl, checkGameExist);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Unexpected launch failure for {productId}: {ex.GetType().Name}");
+                ReportLaunchException(ex);
+            }
+        }
+
+        internal static bool ReportLaunchApiFailure(DmmGamePlayerApiResult result)
+        {
+            if (result.Error is { } error)
+                ReportLaunchException(error);
+            return result.Failed;
+        }
+
+        private static void ReportLaunchException(Exception error) =>
+            NotificationHelper.Error(error switch
+            {
+                TimeoutRejectedException or TimeoutException or OperationCanceledException => Localization.GameLaunchTimedOut,
+                HttpRequestException => Localization.GameLaunchNetworkFailed,
+                _ => Localization.GameLaunchUnexpectedFailure
+            });
+
+        private static async UniTask LaunchGameCore(string productId, TApiGameType type, string? packageImageUrl, bool checkGameExist)
+        {
             var apiType = DmmTypeApiGameHelper.GetGameTypeDataFromApiGameType(type);
             if (apiType.IsCl)
             {
@@ -49,15 +78,15 @@ namespace Celestite.Utils
                 if (checkGameExist)
                 {
                     var clientGames = await DmmGamePlayerApiHelper.MyGameList();
-                    if (clientGames.Failed) return;
+                    if (ReportLaunchApiFailure(clientGames)) return;
 
                     if (!clientGames.Value.Any(x => x.ProductId == productId && x.Type == type))
                     {
                         var advancedType = DmmTypeApiGameHelper.GetGameTypeDataFromApiGameType(type);
                         var targetGameType = await DmmGamePlayerApiHelper.GetGameTypeFromOldKeys(productId, REQUEST_FLOOR.FREE, adult: advancedType.IsAdult);
-                        if (targetGameType.Failed) return;
+                        if (ReportLaunchApiFailure(targetGameType)) return;
                         var addGame = await DmmGamePlayerApiHelper.AddStoreProductToMyGame(targetGameType.Value);
-                        if (addGame.Failed) return;
+                        if (ReportLaunchApiFailure(addGame)) return;
                     }
                 }
 
@@ -72,13 +101,15 @@ namespace Celestite.Utils
                 {
                     // TODO: 注意需要解析conversion_url
                     var launchCl = await DmmGamePlayerApiHelper.LaunchClGame(productId, type);
-                    if (launchCl.Failed) return;
+                    if (ReportLaunchApiFailure(launchCl)) return;
                     if (content.Detail.Version == launchCl.Value.LatestVersion)
                     {
                         var result = ProcessUtils.LaunchProcessWithProductId(productId,
                             Path.Combine(content.Detail.Path, launchCl.Value.ExecFileName), launchCl.Value.ExecuteArgs, out var p,
                             launchCl.Value.IsAdministrator);
                         p?.Dispose();
+                        if (result == ProcessFailedReason.Success && p != null)
+                            NotificationHelper.Info(Localization.GameLaunchStarted);
                         if (result is ProcessFailedReason.Success or ProcessFailedReason.SystemFailed)
                             return;
                     }
@@ -88,7 +119,7 @@ namespace Celestite.Utils
                 else
                 {
                     var installCl = await DmmGamePlayerApiHelper.GetInstallClInfo(productId, type);
-                    if (installCl.Failed) return;
+                    if (ReportLaunchApiFailure(installCl)) return;
                     clInfo = installCl.Value;
 
                     if (!IsInGuiMode())
@@ -123,20 +154,24 @@ namespace Celestite.Utils
             if (apiType.IsChannelBrowser)
             {
                 var launch = await DmmGamePlayerApiHelper.LaunchBrowserGame(productId, type);
-                if (launch.Failed) return;
+                if (ReportLaunchApiFailure(launch)) return;
                 ProcessUtils.OpenExternalLink(launch.Value.LaunchUrl);
                 return;
             }
 
             if (apiType.IsSocialBrowser)
             {
-                if (ConfigUtils.GetDisableIFrameEx())
+                if (ConfigUtils.GetDisableIFrameEx() || !string.IsNullOrEmpty(HttpHelper.ActAuth))
                 {
                     ProcessUtils.OpenExternalLink(DmmBrowserGameLaunchHelper.GetBrowserGameUrl(productId, apiType));
                     return;
                 }
                 var context = await DmmBrowserGameLaunchHelper.GetBrowserPageContext(productId, apiType);
-                if (context == null) return;
+                if (context == null)
+                {
+                    NotificationHelper.Error(Localization.LaunchBrowserGameFailed);
+                    return;
+                }
                 var launchUrl = DmmBrowserGameLaunchHelper.FindAndInvokeLaunchGame(context);
                 if (string.IsNullOrEmpty(launchUrl))
                 {

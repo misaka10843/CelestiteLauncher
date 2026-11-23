@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Celestite.ViewModels.DefaultVM"
              xmlns:fluent="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+             xmlns:icons="clr-namespace:FluentAvalonia.UI.Controls.IconElement;assembly=FluentAvalonia"
              xmlns:locale="using:Celestite.I18N"
              xmlns:views="using:Celestite.Views"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
@@ -12,43 +13,56 @@
 	<UserControl.DataContext>
 		<vm:LoginPageViewModel></vm:LoginPageViewModel>
 	</UserControl.DataContext>
-	<ScrollViewer Padding="20 20 20 0">
-		<StackPanel Spacing="8">
+	<ScrollViewer Padding="24,24,24,32">
+		<StackPanel Spacing="12" MaxWidth="640" HorizontalAlignment="Stretch">
+			<StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
+				<icons:SymbolIcon Symbol="Globe" FontSize="26" VerticalAlignment="Center"/>
+				<TextBlock Text="{x:Static locale:Localization.LoginSubtitle}"
+                           Theme="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center"/>
+			</StackPanel>
 			<fluent:InfoBar
                 Severity="{Binding Severity}"
-                Title="{x:Static locale:Localization.InfoBarDefault}"
                 Message="{Binding InfoBarMessage}"
-                IsOpen="true"
-                IsClosable="False"
-                >
-
-			</fluent:InfoBar>
-			<TextBlock Text="{x:Static locale:Localization.LoginSubtitle}" Theme="{StaticResource SubtitleTextBlockStyle}" Margin="0, 8"></TextBlock>
-			<views:ProxySettingsView IsEnabled="{Binding CanUseLoginButton}"/>
+                IsOpen="{Binding HasLoginStatus}"
+                IsVisible="{Binding HasLoginStatus}"
+                IsClosable="False"/>
 			<fluent:SettingsExpander
                 Header="{x:Static locale:Localization.BrowserLoginTitle}"
                 IconSource="Globe"
                 Description="{x:Static locale:Localization.BrowserLoginDescription}"
                 IsClickEnabled="True"
-                ActionIconSource="ChevronRight"
+                ActionIconSource="ArrowExport"
                 Command="{Binding ShowBrowserLoginCommand}"
                 IsEnabled="{Binding CanUseLoginButton}"/>
-			<StackPanel IsVisible="{Binding BrowserLoginPending}" Spacing="8">
+			<Border IsVisible="{Binding BrowserLoginPending}" Padding="16" CornerRadius="8"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+			<StackPanel Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
+					<icons:SymbolIcon Symbol="Link" VerticalAlignment="Center"/>
+					<TextBlock Text="{x:Static locale:Localization.BrowserLoginCallbackHint}" TextWrapping="Wrap"/>
+				</StackPanel>
 				<TextBox Text="{Binding BrowserLoginCallback, Mode=TwoWay}"
                          PasswordChar="●"
                          Watermark="https://webdgp-gameplayer.games.dmm.com/login/success"/>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Button Content="{x:Static locale:Localization.ButtonOk}" Command="{Binding SubmitBrowserLoginCommand}"/>
-					<Button Content="{x:Static locale:Localization.FormClose}" Command="{Binding CancelBrowserLoginCommand}"/>
+				<StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+					<Button Content="{x:Static locale:Localization.ButtonCancel}" Command="{Binding CancelBrowserLoginCommand}"/>
+					<Button Classes="accent" Command="{Binding SubmitBrowserLoginCommand}" IsEnabled="{Binding CanSubmitBrowserLogin}">
+						<StackPanel Orientation="Horizontal" Spacing="7">
+							<icons:SymbolIcon Symbol="Checkmark" VerticalAlignment="Center"/>
+							<TextBlock Text="{x:Static locale:Localization.BrowserLoginComplete}"/>
+						</StackPanel>
+					</Button>
 				</StackPanel>
 			</StackPanel>
+			</Border>
 			<fluent:SettingsExpander
                 Header="{x:Static locale:Localization.DGPLoginTitle}"
                 IconSource="Games"
                 Description="{x:Static locale:Localization.DGPLoginDescription}"
                 IsClickEnabled="True"
                 ActionIconSource="ChevronRight"
-                Command="{Binding ShowDmmLoginButtonCommand}">
+                Command="{Binding ShowDmmLoginButtonCommand}" IsVisible="{Binding IsDmmLoginEnabled}">
 				<fluent:SettingsExpander.IsEnabled>
 					<MultiBinding Converter="{x:Static BoolConverters.And}">
 						<Binding Path="CanUseLoginButton"></Binding>
@@ -57,7 +71,7 @@
 				</fluent:SettingsExpander.IsEnabled>
 
 			</fluent:SettingsExpander>
-			<TextBlock Text="{x:Static locale:Localization.RegisterSubtitle}" Theme="{StaticResource SubtitleTextBlockStyle}" Margin="0, 8"></TextBlock>
+			<views:ProxySettingsView IsEnabled="{Binding CanUseLoginButton}"/>
 			<fluent:SettingsExpander
                 Header="{x:Static locale:Localization.RegisterButtonTitle}"
                 IconSource="PersonAdd"

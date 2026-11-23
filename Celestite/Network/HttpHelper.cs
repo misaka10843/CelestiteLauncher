@@ -778,7 +778,11 @@ namespace Celestite.Network
             try
             {
                 var url = ZString.Concat(baseUrl, path);
-                var response = await MainHttpClient.GetFromJsonAsync(new Uri(AddQueryString(url, queryData)), responseJsonTypeInfo, cancellationToken).ConfigureAwait(false);
+                using var request = new HttpRequestMessage(HttpMethod.Get, AddQueryString(url, queryData));
+                AddGamePlayerAuthorization(request);
+                using var httpResponse = await MainHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                httpResponse.EnsureSuccessStatusCode();
+                var response = await httpResponse.Content.ReadFromJsonAsync(responseJsonTypeInfo, cancellationToken).ConfigureAwait(false);
                 return response != null ? NetworkOperationResult.Ok(response) : throw new NullReferenceException("formQueryResponse");
             }
             catch (Exception ex)

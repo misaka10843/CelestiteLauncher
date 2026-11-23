@@ -296,7 +296,6 @@ namespace Celestite.Utils
         public static bool GetMinimizeToTray() => _config.BaseSection.MinimizeToTray;
         public static bool GetBypassSystemProxy() => _config.BaseSection.BypassSystemProxy;
         public static string GetLanguageCode() => _config.BaseSection.Locale;
-        public static bool GetEnableEmbeddedWebView() => _config.BaseSection.EnableEmbeddedWebView;
         public static bool GetDisableIFrameEx() => _config.BaseSection.DisableIFrameEx;
         public static bool GetSafeFanzaIcon() => _config.BaseSection.SafeFanzaIcon;
 
@@ -325,11 +324,6 @@ namespace Celestite.Utils
         public static void SetLanguageCode(string value)
         {
             _config.BaseSection.Locale = value;
-            Save();
-        }
-        public static void SetEnableEmbeddedWebView(bool value)
-        {
-            _config.BaseSection.EnableEmbeddedWebView = value;
             Save();
         }
         public static void SetDisableIFrameEx(bool value)

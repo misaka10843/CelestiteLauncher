@@ -95,19 +95,6 @@
                         ></ToggleSwitch>
 			</fluent:SettingsExpander.Footer>
 		</fluent:SettingsExpander>
-		<fluent:SettingsExpander IsVisible="{OnPlatform Windows=True, Linux=False}"
-            Header="{x:Static locale:Localization.EnableEmbeddedWebView}"
-            Description="{x:Static locale:Localization.EnableEmbeddedWebViewDescription}"
-            IconSource="ContentViewGallery"
-        >
-			<fluent:SettingsExpander.Footer>
-				<ToggleSwitch
-                    IsChecked="{Binding EnableEmbeddedWebView}"
-                    OffContent="{x:Static locale:Localization.ToggleOff}"
-                    OnContent="{x:Static locale:Localization.ToggleOn}"
-                ></ToggleSwitch>
-			</fluent:SettingsExpander.Footer>
-		</fluent:SettingsExpander>
 		<fluent:SettingsExpander
             Header="{x:Static locale:Localization.DisableIFrameEx}"
             Description="{x:Static locale:Localization.DisableIFrameExDescription}"

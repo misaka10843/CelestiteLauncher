@@ -1,14 +1,31 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="using:Celestite.I18N"
+             xmlns:fluent="using:FluentAvalonia.UI.Controls"
+             xmlns:icons="clr-namespace:FluentAvalonia.UI.Controls.IconElement;assembly=FluentAvalonia"
              x:Class="Celestite.Views.ProxySettingsView">
-    <Expander Header="{x:Static loc:Localization.CustomProxyTitle}" HorizontalAlignment="Stretch">
-        <StackPanel Spacing="8">
+    <Expander HorizontalAlignment="Stretch">
+        <Expander.Header>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <icons:SymbolIcon Symbol="NetworkCheck" VerticalAlignment="Center"/>
+                <TextBlock Text="{x:Static loc:Localization.CustomProxyTitle}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Expander.Header>
+        <StackPanel Spacing="12" Margin="0,4,0,0">
             <TextBlock Text="{x:Static loc:Localization.CustomProxyDescription}" TextWrapping="Wrap"/>
-            <TextBox x:Name="ProxyAddress" Watermark="http://127.0.0.1:7890"/>
+            <TextBox x:Name="ProxyAddress" Watermark="http://127.0.0.1:7890"
+                     AutomationProperties.Name="{x:Static loc:Localization.CustomProxyTitle}"/>
             <CheckBox x:Name="PassToGames" Content="{x:Static loc:Localization.CustomProxyGames}"/>
-            <Button Content="{x:Static loc:Localization.CustomProxySave}" Click="SaveProxy"/>
-            <TextBlock x:Name="Status" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Content="{x:Static loc:Localization.CustomProxyClear}" Click="ClearProxy"/>
+                <Button Classes="accent" Click="SaveProxy">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <icons:SymbolIcon Symbol="Save" VerticalAlignment="Center"/>
+                        <TextBlock Text="{x:Static loc:Localization.CustomProxySave}"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <fluent:InfoBar x:Name="Status" IsVisible="False" IsClosable="False"/>
         </StackPanel>
     </Expander>
 </UserControl>

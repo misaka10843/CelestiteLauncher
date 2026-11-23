@@ -40,12 +40,6 @@
     <PackageReference Include="ZeroLog" Version="2.1.1" />
   </ItemGroup>
 
-  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
-    <DirectPInvoke Include="Carleen" />
-    <NativeLibrary Include="..\3rdParty\WebView2LoaderStatic.lib" />
-    <NativeLibrary Include="..\3rdParty\Carleen.lib" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Celestite\Celestite.csproj" />
   </ItemGroup>

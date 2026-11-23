@@ -111,6 +111,11 @@ namespace Celestite.ViewModels.Pages
                     return;
                 }
 
+                if (!BrowserSessionStore.Clear())
+                {
+                    NotificationHelper.Warn(Localization.BrowserLoginForgetFailed);
+                    return;
+                }
                 DmmGamePlayerApiHelper.SetUserCookies(accountObject.LoginSecureId, accountObject.LoginSessionId);
                 DmmGamePlayerApiHelper.SetAgeCheckDone();
                 ConfigUtils.PushAccountObject(accountObject);

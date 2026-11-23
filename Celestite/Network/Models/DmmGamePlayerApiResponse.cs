@@ -127,12 +127,11 @@ public sealed class SearchGameData
     [JsonIgnore]
     public string TransformGameId => LazyInitializer.EnsureInitialized(ref _transformGameId, () =>
     {
-        if (!ProductId.StartsWith("app_"))
+        if (ProductId?.StartsWith("app_", StringComparison.OrdinalIgnoreCase) != true)
             return string.Empty;
-        if (Link.PageLinkType != "external")
+        if (Link?.PageLinkType != "external" || !Uri.TryCreate(Link.Url, UriKind.Absolute, out var uri))
             return string.Empty;
-        var uri = new Uri(Link.Url);
-        if (uri.Host != "www.dmm.com" && uri.Host != "www.dmm.co.jp")
+        if (uri.Scheme is not ("https" or "http") || uri.Host is not ("www.dmm.com" or "www.dmm.co.jp"))
             return string.Empty;
         if (uri.Segments is not ["/", "netgame_s/", var gameId])
             return string.Empty;

@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Controls;
-using Avalonia.Data.Converters;
 using Avalonia.Threading;
 using Celestite.Dialogs.Games;
 using Celestite.I18N;
@@ -30,22 +28,6 @@ namespace Celestite.ViewModels.Pages
         Download = 0, Browser = 1
     }
 
-    public class GameTypeConverter : IValueConverter
-    {
-        public static readonly GameTypeConverter Instance = new();
-
-        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            if (value is GameType gameType && parameter is string a && int.TryParse(a, out var p))
-                return (int)gameType == p;
-            throw new NotSupportedException();
-        }
-
-        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            throw new NotSupportedException();
-        }
-    }
     public partial class GamesPageViewModel : ViewModelBase
     {
         [ObservableProperty] private AvaloniaList<MyGame> _gamesSource = [];
@@ -54,12 +36,19 @@ namespace Celestite.ViewModels.Pages
 
         [ObservableProperty] private bool _isOnlyShowViewable = true;
         [ObservableProperty] private string _filterText = string.Empty;
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowLibraryStatus), nameof(LibraryStatus))]
+        private bool _isLibraryLoading;
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowLibraryStatus), nameof(LibraryStatus))]
+        private bool _libraryLoadFailed;
+        public bool ShowLibraryStatus => Games.Count == 0;
+        public string LibraryStatus => IsLibraryLoading ? Localization.LibraryLoading :
+            LibraryLoadFailed ? Localization.LibraryLoadFailed : Localization.LibraryEmpty;
         public bool SafeIconEnabled { get; set; } = ConfigUtils.GetSafeFanzaIcon();
 
-        private static AddClientGameDialogViewModel? _permanentAddClientGameDialogViewModel;
+        private static GameCatalogDialogViewModel? _permanentAddClientGameDialogViewModel;
         private static AddBrowserGameDialogViewModel? _permanentAddBrowserGameDialogViewModel;
 
-        private static AddClientGameDialogViewModel PermanentAddClientGameDialogViewModel => LazyInitializer.EnsureInitialized(ref _permanentAddClientGameDialogViewModel, () => new());
+        private static GameCatalogDialogViewModel PermanentAddClientGameDialogViewModel => LazyInitializer.EnsureInitialized(ref _permanentAddClientGameDialogViewModel, () => new());
         private static AddBrowserGameDialogViewModel PermanentAddBrowserGameDialogViewModel => LazyInitializer.EnsureInitialized(ref _permanentAddBrowserGameDialogViewModel, () => new());
 
         private static ContentDialog? _addGameDialog = null;
@@ -70,32 +59,43 @@ namespace Celestite.ViewModels.Pages
             (search, item) =>
             {
                 if (string.IsNullOrEmpty(search) || item is not MyGame x) return false;
-                return x.Title.Contains(search, StringComparison.OrdinalIgnoreCase) || x.Romaji.Contains(search, StringComparison.OrdinalIgnoreCase) || x.TitleRuby.Contains(search);
+                return MatchesLibrarySearch(x, search);
             };
 
-        public static ContentDialog AddGameDialog => LazyInitializer.EnsureInitialized(ref _addGameDialog, () => Dispatcher.UIThread.Invoke(() => new ContentDialog()
+        private static bool MatchesLibrarySearch(MyGame game, string query) =>
+            query.Length == 0 ||
+            game.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+            game.ProductId?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+            game.TitleRuby?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+            (!string.IsNullOrEmpty(game.TitleRuby) && game.Romaji.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+        private static ContentDialog AddGameDialog => LazyInitializer.EnsureInitialized(ref _addGameDialog, () =>
+            CreateCatalogDialog(Localization.AddClientGameDialogTitle, PermanentAddClientGameDialogViewModel, new AddClientGameDialog()));
+
+        private static ContentDialog AddBrowserGameDialog => LazyInitializer.EnsureInitialized(ref _addBrowserGameDialog, () =>
+            CreateCatalogDialog(Localization.AddBrowserGameDialogTitle, PermanentAddBrowserGameDialogViewModel, new AddBrowserGameDialog()));
+
+        private static ContentDialog CreateCatalogDialog(string title, GameCatalogDialogViewModel viewModel, Control content)
         {
-            IsVisible = false,
-            Title = Localization.AddClientGameDialogTitle,
-            PrimaryButtonText = Localization.ButtonOk,
-            IsPrimaryButtonEnabled = true,
-            CloseButtonText = Localization.ButtonCancel,
-            DataContext = PermanentAddClientGameDialogViewModel,
-            DefaultButton = ContentDialogButton.Primary,
-            Content = new AddClientGameDialog() { DataContext = PermanentAddClientGameDialogViewModel }
-        }));
-        public static ContentDialog AddBrowserGameDialog => LazyInitializer.EnsureInitialized(ref _addBrowserGameDialog, () => Dispatcher.UIThread.Invoke(() =>
-                new ContentDialog()
-                {
-                    IsVisible = false,
-                    Title = Localization.AddBrowserGameDialogTitle,
-                    PrimaryButtonText = Localization.ButtonOk,
-                    IsPrimaryButtonEnabled = true,
-                    CloseButtonText = Localization.ButtonCancel,
-                    DataContext = PermanentAddBrowserGameDialogViewModel,
-                    DefaultButton = ContentDialogButton.Primary,
-                    Content = new AddBrowserGameDialog() { DataContext = PermanentAddBrowserGameDialogViewModel }
-                }));
+            content.DataContext = viewModel;
+            var dialog = new ContentDialog
+            {
+                IsVisible = false,
+                Title = title,
+                PrimaryButtonText = Localization.CatalogAddSelected,
+                IsPrimaryButtonEnabled = viewModel.SelectedGame != null,
+                CloseButtonText = Localization.ButtonCancel,
+                DefaultButton = ContentDialogButton.Primary,
+                Content = content
+            };
+            viewModel.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(GameCatalogDialogViewModel.SelectedGame))
+                    dialog.IsPrimaryButtonEnabled = viewModel.SelectedGame != null;
+            };
+            return dialog;
+        }
+
         public static ContentDialog AgreementDialog => LazyInitializer.EnsureInitialized(ref _agreementDialog, () => Dispatcher.UIThread.Invoke(() => new ContentDialog()
         {
             IsVisible = false,
@@ -122,8 +122,11 @@ namespace Celestite.ViewModels.Pages
         {
             DmmGamePlayerApiHelper.AdultModeChangedEvent += (_, _) =>
             {
-                PermanentAddClientGameDialogViewModel.Games.Clear();
-                PermanentAddBrowserGameDialogViewModel.Games.Clear();
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    PermanentAddClientGameDialogViewModel.Games = [];
+                    PermanentAddBrowserGameDialogViewModel.Games = [];
+                });
             };
             DmmGamePlayerApiHelper.ReGetGamesRequiredEvent += (_, _) => Dispatcher.UIThread.Invoke(RemoteUpdate);
             DmmGamePlayerApiHelper.LoginSessionChangedEvent += (_, _) => Dispatcher.UIThread.Invoke(RemoteUpdate);
@@ -143,9 +146,6 @@ namespace Celestite.ViewModels.Pages
                 }
             };
 
-            UpdateEmbeddedBrowserUser(DmmGamePlayerApiHelper.CurrentUserInfo);
-            DmmGamePlayerApiHelper.UserInfoChangedEvent += (currentUserInfo, _) => UpdateEmbeddedBrowserUser(currentUserInfo as UserInfo);
-
             GamesSource.CollectionChanged += (_, e) =>
             {
                 if (e.Action == NotifyCollectionChangedAction.Reset)
@@ -156,20 +156,6 @@ namespace Celestite.ViewModels.Pages
             RemoteUpdate();
         }
 
-        private static void UpdateEmbeddedBrowserUser(UserInfo? userInfo)
-        {
-            if (!OperatingSystem.IsWindows() || userInfo == null) return;
-
-            try
-            {
-                Carleen.UpdateCurrentUser(userInfo.OpenId, HttpHelper.LoginSecureId, HttpHelper.LoginSessionId);
-            }
-            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
-            {
-                ZeroLog.LogManager.GetLogger("WebView").Warn("Embedded browser session synchronization is unavailable.", ex);
-            }
-        }
-
         private void GamesShouldBeChanged()
         {
             Games.Clear();
@@ -177,8 +163,9 @@ namespace Celestite.ViewModels.Pages
                 .Where(x => x.IsView == IsOnlyShowViewable)
                 .OrderByDescending(x => x.IsFavorite)
                 .ThenByDescending(x => ConfigUtils.GetGameSettingsForcePin(x.ProductId))
-                .Where(x => x.Title.Contains(FilterText, StringComparison.OrdinalIgnoreCase) || x.Romaji.Contains(FilterText, StringComparison.OrdinalIgnoreCase) || x.TitleRuby.Contains(FilterText));
+                .Where(x => MatchesLibrarySearch(x, FilterText?.Trim() ?? string.Empty));
             Games.AddRange(games);
+            OnPropertyChanged(nameof(ShowLibraryStatus));
         }
 
         public static async UniTask InvokeNotConsentAgreement(string productId, TApiGameType gameType)
@@ -215,31 +202,54 @@ namespace Celestite.ViewModels.Pages
         [RelayCommand]
         private void NotifyCollectionChanged() => GamesShouldBeChanged();
         partial void OnFilterTextChanged(string value) => NotifyCollectionChanged();
+        [RelayCommand]
         private void RemoteUpdate() => UpdateGameList(SelectedIndex).Forget();
 
         private CancellationTokenSource? _cancellationTokenSource = null;
         private async UniTask UpdateGameList(GameType gameType)
         {
-            GamesSource.Clear();
-            Games.Clear();
-            if (_cancellationTokenSource != null)
+            var previousRequest = _cancellationTokenSource;
+            using var request = new CancellationTokenSource();
+            _cancellationTokenSource = request;
+            previousRequest?.Cancel();
+            IsLibraryLoading = true;
+            LibraryLoadFailed = false;
+            try
             {
-                await _cancellationTokenSource.CancelAsync();
-                _cancellationTokenSource.Dispose();
+                var gameList = gameType switch
+                {
+                    GameType.Download => await DmmGamePlayerApiHelper.MyGameList(request.Token),
+                    GameType.Browser => await DmmGamePlayerApiHelper.MyBrowserGameList(request.Token),
+                    _ => throw new NotImplementedException()
+                };
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    if (!ReferenceEquals(_cancellationTokenSource, request)) return;
+                    if (gameList.Failed)
+                    {
+                        LibraryLoadFailed = true;
+                        return;
+                    }
+                    GamesSource.Clear();
+                    GamesSource.AddRange(gameList.Value);
+                });
             }
-            _cancellationTokenSource = new CancellationTokenSource();
-            var gameList = gameType switch
+            finally
             {
-                GameType.Download => await DmmGamePlayerApiHelper.MyGameList(_cancellationTokenSource.Token),
-                GameType.Browser => await DmmGamePlayerApiHelper.MyBrowserGameList(_cancellationTokenSource.Token),
-                _ => throw new NotImplementedException()
-            };
-            if (gameList.Failed) return;
-            Dispatcher.UIThread.Invoke(() => GamesSource.AddRange(gameList.Value));
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    if (ReferenceEquals(_cancellationTokenSource, request))
+                    {
+                        _cancellationTokenSource = null;
+                        IsLibraryLoading = false;
+                    }
+                });
+            }
         }
 
         partial void OnSelectedIndexChanged(GameType value)
         {
+            GamesSource.Clear();
             UpdateGameList(value).Forget();
         }
 
@@ -248,82 +258,84 @@ namespace Celestite.ViewModels.Pages
             GamesShouldBeChanged();
         }
 
-        private const int Limit = 120;
-
-        [RelayCommand]
-        private async Task OpenAddClientGameDialog()
+        private static async Task<bool> LoadGameCatalog(GameCatalogDialogViewModel viewModel, bool browser)
         {
-            if (PermanentAddClientGameDialogViewModel.Games.Count == 0)
+            if (viewModel.Games.Count > 0) return true;
+            const int pageSize = 120;
+            var games = new List<SearchGameData>();
+            bool adultMode = DmmGamePlayerApiHelper.IsAdultMode;
+            string article = browser ? "browser:1" : "download:1";
+            for (int page = 1; ; page++)
             {
-                var search = await DmmGamePlayerApiHelper.Search(REQUEST_FLOOR.FREE, "download:1", limit: Limit, page: 1);
-                if (search.Failed) return;
-                var list = new List<SearchGameData>(search.Value.List);
-                if (search.Value.TotalHitCount > Limit)
+                var response = await DmmGamePlayerApiHelper.Search(REQUEST_FLOOR.FREE, article, pageSize, page);
+                if (response.Failed || response.Value is not { List: { } items } catalog)
                 {
-                    var tasks = new UniTask<DmmGamePlayerApiResult<Search>>[(int)Math.Ceiling((double)(search.Value.TotalHitCount - Limit) / Limit)];
-                    for (var i = 0; i < tasks.Length; i++)
-                        tasks[i] = DmmGamePlayerApiHelper.Search(REQUEST_FLOOR.FREE, "download:1", Limit, page: 2 + i);
-                    var completed = await UniTask.WhenAll(tasks);
-                    if (completed.Any(x => x.Failed)) return;
-                    foreach (var dmmGamePlayerApiResult in completed)
-                    {
-                        list.AddRange(dmmGamePlayerApiResult.Value.List);
-                    }
+                    NotificationHelper.Warn(Localization.CatalogLoadFailed);
+                    return false;
                 }
-                PermanentAddClientGameDialogViewModel.Games = list;
+                if (adultMode != DmmGamePlayerApiHelper.IsAdultMode) return false;
+                games.AddRange(browser ? items.Where(game => game.TransformGameId.Length != 0) : items);
+                if (items.Count == 0 || (long)page * pageSize >= catalog.TotalHitCount) break;
             }
-
-            if (await Dispatcher.UIThread.InvokeAsync(AddGameDialog.ShowAsync) !=
-                ContentDialogResult.Primary) return;
-            try
+            return Dispatcher.UIThread.Invoke(() =>
             {
-                var validCheck = PermanentAddClientGameDialogViewModel.Games.FirstOrDefault(x =>
-                    x.ProductId == PermanentAddClientGameDialogViewModel.GameId);
-                if (validCheck != null)
-                {
-                    var gameType =
-                        await DmmGamePlayerApiHelper.GetGameTypeFromOldKeys(
-                            PermanentAddClientGameDialogViewModel.GameId,
-                            validCheck.Floor, adult: DmmGamePlayerApiHelper.IsAdultMode);
-                    if (gameType.Failed) return;
-                    var addResult = await DmmGamePlayerApiHelper.AddStoreProductToMyGame(gameType.Value);
-                    if (addResult.Failed) return;
-                }
-            }
-            finally
-            {
-                PermanentAddClientGameDialogViewModel.GameId = string.Empty;
-            }
+                if (adultMode != DmmGamePlayerApiHelper.IsAdultMode) return false;
+                viewModel.Games = games.Where(game => !string.IsNullOrWhiteSpace(game.ProductId))
+                    .DistinctBy(game => game.ProductId, StringComparer.OrdinalIgnoreCase).ToList();
+                return true;
+            });
         }
 
         [RelayCommand]
+        private Task OpenGameCatalog() => SelectedIndex == GameType.Browser
+            ? OpenAddBrowserGameDialog()
+            : OpenAddClientGameDialog();
+
+        private async Task OpenAddClientGameDialog()
+        {
+            var viewModel = PermanentAddClientGameDialogViewModel;
+            if (!await LoadGameCatalog(viewModel, browser: false)) return;
+            if (await Dispatcher.UIThread.Invoke(() =>
+                {
+                    viewModel.ResetSelection();
+                    return AddGameDialog.ShowAsync();
+                }) !=
+                ContentDialogResult.Primary) return;
+            if (viewModel.SelectedGame is not { } selected)
+            {
+                NotificationHelper.Warn(Localization.CatalogSelectGame);
+                return;
+            }
+            var gameType = await DmmGamePlayerApiHelper.GetGameTypeFromOldKeys(selected.ProductId,
+                selected.Floor, adult: DmmGamePlayerApiHelper.IsAdultMode);
+            if (gameType.Failed) return;
+            await DmmGamePlayerApiHelper.AddStoreProductToMyGame(gameType.Value);
+        }
+
         private async Task OpenAddBrowserGameDialog()
         {
-            if (PermanentAddBrowserGameDialogViewModel.Games.Count == 0)
-            {
-                var search = await DmmGamePlayerApiHelper.Search(REQUEST_FLOOR.FREE, "browser:1", limit: Limit, page: 1);
-                if (search.Failed) return;
-                var list = new List<SearchGameData>(search.Value.List.Where(x => !string.IsNullOrEmpty(x.TransformGameId)));
-                if (search.Value.TotalHitCount > Limit)
+            var viewModel = PermanentAddBrowserGameDialogViewModel;
+            if (!await LoadGameCatalog(viewModel, browser: true)) return;
+            if (await Dispatcher.UIThread.Invoke(() =>
                 {
-                    var tasks = new UniTask<DmmGamePlayerApiResult<Search>>[(int)Math.Ceiling((double)(search.Value.TotalHitCount - Limit) / Limit)];
-                    for (var i = 0; i < tasks.Length; i++)
-                        tasks[i] = DmmGamePlayerApiHelper.Search(REQUEST_FLOOR.FREE, "browser:1", Limit, page: 2 + i);
-                    var completed = await UniTask.WhenAll(tasks);
-                    if (completed.Any(x => x.Failed)) return;
-                    foreach (var dmmGamePlayerApiResult in completed)
-                    {
-                        list.AddRange(dmmGamePlayerApiResult.Value.List.Where(x => !string.IsNullOrEmpty(x.TransformGameId)));
-                    }
-                }
-                PermanentAddBrowserGameDialogViewModel.Games = list;
-            }
-            if (await Dispatcher.UIThread.InvokeAsync(AddBrowserGameDialog.ShowAsync) !=
+                    viewModel.ResetSelection();
+                    return AddBrowserGameDialog.ShowAsync();
+                }) !=
                 ContentDialogResult.Primary) return;
-            var result = await DmmBrowserGameLaunchHelper.TryAddBrowserGame(PermanentAddBrowserGameDialogViewModel.GameId,
-                PermanentAddBrowserGameDialogViewModel.IsNotificationAllowed,
-                PermanentAddBrowserGameDialogViewModel.IsDisplayAllowed);
-            PermanentAddBrowserGameDialogViewModel.GameId = string.Empty;
+            if (viewModel.SelectedGame is not { } selected)
+            {
+                NotificationHelper.Warn(Localization.CatalogSelectGame);
+                return;
+            }
+            if (!string.IsNullOrEmpty(HttpHelper.ActAuth))
+            {
+                ProcessUtils.OpenExternalLink(DmmBrowserGameLaunchHelper.GetBrowserGameActivationUrl(selected.TransformGameId,
+                    viewModel.IsNotificationAllowed, viewModel.IsDisplayAllowed));
+                NotificationHelper.Info(Localization.CatalogFinishInBrowser);
+                return;
+            }
+            var result = await DmmBrowserGameLaunchHelper.TryAddBrowserGame(selected.TransformGameId,
+                viewModel.IsNotificationAllowed, viewModel.IsDisplayAllowed);
             if (result)
                 DmmGamePlayerApiHelper.ForceRaiseReGetGamesRequiredEvent();
         }
@@ -335,6 +347,10 @@ namespace Celestite.Network.Models
 {
     public partial class MyGame : ViewModelBase
     {
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(LaunchButtonText))]
+        private bool _isLaunching;
+        public string LaunchButtonText => IsLaunching ? Localization.GameLaunching : Localization.ButtonLaunch;
+
         [RelayCommand]
         private async Task EmulateLaunch() => await LaunchHelper.EmulateLaunch(ProductId, ApiType);
 
@@ -342,6 +358,17 @@ namespace Celestite.Network.Models
         private void OpenGameSettings() => GameNavigationFactory.Instance.GetFrame().NavigateFromObject(this);
 
         [RelayCommand]
-        private async Task LaunchGame() => await LaunchHelper.LaunchGame(ProductId, Type, PackageImageUrl);
+        private async Task LaunchGame()
+        {
+            IsLaunching = true;
+            try
+            {
+                await LaunchHelper.LaunchGame(ProductId, Type, PackageImageUrl);
+            }
+            finally
+            {
+                Dispatcher.UIThread.Invoke(() => IsLaunching = false);
+            }
+        }
     }
 }

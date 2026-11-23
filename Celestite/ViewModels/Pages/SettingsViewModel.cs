@@ -40,7 +40,6 @@ namespace Celestite.ViewModels.Pages
         [ObservableProperty] private bool _minimizeToTray = ConfigUtils.GetMinimizeToTray();
         [ObservableProperty] private bool _banSystemProxy = ConfigUtils.GetBypassSystemProxy();
         [ObservableProperty] private string _languageCode = ConfigUtils.GetLanguageCode();
-        [ObservableProperty] private bool _enableEmbeddedWebView = ConfigUtils.GetEnableEmbeddedWebView();
         [ObservableProperty] private bool _disableIFrameEx = ConfigUtils.GetDisableIFrameEx();
         [ObservableProperty] private bool _safeFanzaIcon = ConfigUtils.GetSafeFanzaIcon();
 
@@ -97,7 +96,6 @@ namespace Celestite.ViewModels.Pages
 
         partial void OnMinimizeToTrayChanged(bool value) => ConfigUtils.SetMinimizeToTray(value);
         partial void OnBanSystemProxyChanged(bool value) => ConfigUtils.SetBypassSystemProxy(value);
-        partial void OnEnableEmbeddedWebViewChanged(bool value) => ConfigUtils.SetEnableEmbeddedWebView(value);
         partial void OnDisableIFrameExChanged(bool value) => ConfigUtils.SetDisableIFrameEx(value);
         partial void OnLanguageCodeChanged(string value) => ConfigUtils.SetLanguageCode(value);
         partial void OnSafeFanzaIconChanged(bool value) => ConfigUtils.SetSafeFanzaIcon(value);
@@ -111,6 +109,11 @@ namespace Celestite.ViewModels.Pages
         [RelayCommand]
         private void Logout()
         {
+            if (!BrowserSessionStore.Clear())
+            {
+                NotificationHelper.Warn(Localization.BrowserLoginForgetFailed);
+                return;
+            }
             ConfigUtils.ClearLastLogin();
             Environment.Exit(0);
         }

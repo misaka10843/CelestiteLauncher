@@ -309,6 +309,7 @@ namespace Celestite.Configs
         // Retained for compatibility with existing MemoryPack config files.
         [MemoryPackOrder(5)] public bool EnableHimariProxy { get; set; } = false;
         [MemoryPackOrder(6)] public bool BypassSystemProxy { get; set; } = false;
+        // Retained for compatibility with existing MemoryPack config files.
         [MemoryPackOrder(7)] public bool EnableEmbeddedWebView { get; set; } = false;
         [MemoryPackOrder(8)] public bool DisableIFrameEx { get; set; } = false;
         [MemoryPackOrder(9)] public bool SafeFanzaIcon { get; set; } = false;
